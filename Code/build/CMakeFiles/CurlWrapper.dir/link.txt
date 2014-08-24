@@ -1,0 +1,1 @@
+/usr/bin/c++       CMakeFiles/CurlWrapper.dir/src/CURLWrapper.cpp.o  -o bin/CurlWrapper -rdynamic ../libccv/lib/libccv.a /usr/local/lib/libjpeg.so /usr/local/lib/libpng.so /usr/local/lib/libtesseract.so /usr/local/lib/liblept.so /usr/local/lib/libcurl.so -Wl,-rpath,/usr/local/lib 

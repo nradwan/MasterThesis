@@ -1,0 +1,52 @@
+First paper:
+--check out: Yamaguchi and Maruyama [5] propose a method to
+extract character regions in natural scene images by
+hierarchical classifiers. The hierarchy consists of two
+types of classifiers: a histogram-based classifier and
+SVM.
+--check out: [7] [8] for the current paper to do the image binarization and enhancement (described in steps below)
+--Steps::
++first preprocessing by using a low-pass wiener filter (for color images use the luminance component)
++use Sauvola's approach for adaptive thresholding with k=0.2 to get binary image S where 1 represents estimated foreground regions
++background surface estimation B: pixels which got value 0 in S, get a value in B equivalent to their value in O (original image), for the remaining pixels, the value is computed by neighbouring pixel interpolation.
++final thresholding: combine the background with the original image. Text areas have distance between O(x,y) and B(x,y) > d (threshold). d changes according to gray-scale value of B in order to preserve text information in dark background areas. (smaller d in darker regions)
++image upsampling: using bicubic interpolation. pixel in destination is estimated by average of 16 closest pixels to the corresponding pixel in source.
++image post-processing: use shrink and swell filtering
+--Do previous steps for both original and negative gray scale image to ensure getting text information
+--CCA (not fully understood yet)
+
+Second paper:
+--more similar to what is described in the paper by posner and newmann
+--need more understanding still
+
+Third paper:
+--check out:  Niblack dynamic thresholding [6] as modified by Gatos et. al[1]==> this is in fact the first paper!!
+--seems similar to first paper approach (maybe ask about the component segmentation or try reading more about it)
+
+##Maybe use 1st paper approach combined with the filters described in the 3rd paper
+===> basically just use the 3rd paper with the 1st paper as written!
+
+
+NEW PLAN:
+Follow the text-spotting paper!
+Steps for the gradient paper (second paper above):
+--Compute the gradient vector and the gradient magnitude
+--Compute the Census Transform (check description in paper as how to)
+--Define 5 partitions based on gradient based features. Compute the regions for each of the 4 pictures (3 gradient and 1 CT)
+--Use cascade gentle adaboost classifiers with descision stump as the adaboost weaklearner
+--Ask about last section before results
+
+
+================================================================
+Status Update 21/08:
+--integrated libccv and tesseract together
+--tesseract has better output with libccv
+--sometimes some letters are cropped out of the text
+--the confidence level returned by tesseract is not very accurate
+--other text spotting method in opencv is still not available in stable opencv release version
+--thought about training tesseract with some outdoor scene images along with the german language data to provide as input (feseability of this approach?)
+--thought about using dictionary checks with probablistic background to correct the tesseract output string
+--thought about completely relying on google api for character substitutions/croppings
+--is it useful to not load the system-generated dictionary from tesseract in the case of recognizing names of streets/shops to increase the recognition value or not (needs inspection)
+--using the google api to search for the text returned from the previous action ===> a) api uses javascript (how to integrate)
+																					 b) could use place searches 

@@ -1,0 +1,1 @@
+/usr/bin/c++       CMakeFiles/Main.dir/src/main.cpp.o  -o bin/Main -rdynamic ../libccv/lib/libccv.a /usr/local/lib/libjpeg.so /usr/local/lib/libpng.so /usr/local/lib/libtesseract.so /usr/local/lib/liblept.so /usr/local/lib/libcurl.so -lopencv_highgui -lopencv_core -lopencv_features2d -lopencv_imgproc -Wl,-rpath,/usr/local/lib 

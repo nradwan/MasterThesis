@@ -1,0 +1,2 @@
+/home/noha/Documents/UniversityofFreiburg/MasterThesis/Code/build/CMakeFiles/CurlWrapper.dir
+/home/noha/Documents/UniversityofFreiburg/MasterThesis/Code/build/CMakeFiles/Main.dir

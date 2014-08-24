@@ -1,0 +1,113 @@
+PROJECT (Code)
+
+cmake_minimum_required (VERSION 2.6)
+
+# make a lib directory in the build directory
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
+
+# tell cmake that the library goes in the library directory
+set(LIBRARY_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/lib)
+
+# make a binary directory in the build directory
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
+
+# tell cmake that the binaries goes in the binary directory
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/bin)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Code")
+#set(JPEG_INCLUDE_DIR "/home/noha/Documents/UniversityofFreiburg/MasterThesis/jpeg-9a")
+set(PNG_INCLUDE_DIR "/home/noha/Documents/UniversityofFreiburg/MasterThesis/libpng-1.6.12")
+
+FIND_PACKAGE(OpenCV REQUIRED)
+
+find_package(CCV REQUIRED)
+include_directories(${CCV_INCLUDE_DIR})
+set(LIBS ${CCV_LIBRARY})
+
+find_package(JPEG REQUIRED)
+include_directories(${JPEG_INCLUDE_DIR})
+set(LIBS ${LIBS} ${JPEG_LIBRARY})
+
+find_package(PNG REQUIRED)
+include_directories(${PNG_INCLUDE_DIR})
+message(STATUS "png dir: ${PNG_INCLUDE_DIR}") 
+set(LIBS ${LIBS} ${PNG_LIBRARY})
+
+# find tesseract
+set(TESSERACT_INCLUDE_PATH "/usr/local/include/tesseract")
+include_directories(${TESSERACT_INCLUDE_PATH})
+
+SET(TESSERACT_NAMES ${TESSERACT_NAMES} libtesseract.so)
+FIND_LIBRARY(TESSERACT_LIBRARY NAMES ${TESSERACT_NAMES}
+  PATHS
+  /usr/lib
+  /home/noha/Documents/UniversityofFreiburg/MasterThesis/tesseract-3.03/api
+)
+
+MESSAGE(STATUS "Found Tesseract: ${TESSERACT_LIBRARY}")
+
+set(LIBS ${LIBS} ${TESSERACT_LIBRARY})
+
+#find leptonica
+set(LEPTONICA_INCLUDE_PATH "/usr/local/include/leptonica")
+include_directories(${LEPTONICA_INCLUDE_PATH})
+
+SET(LEPTONICA_NAMES ${LEPTONICA_NAMES} liblept.so)
+FIND_LIBRARY(LEPTONICA_LIBRARY NAMES ${LEPTONICA_NAMES}
+	PATHS
+	/usr/local/lib
+	/home/noha/Documents/UniversityofFreiburg/MasterThesis/leptonica-1.71/
+)
+
+MESSAGE(STATUS "Found Leptonica: ${LEPTONICA_LIBRARY}")
+
+set(LIBS ${LIBS} ${LEPTONICA_LIBRARY})
+
+#find libcurl
+set(CURL_INCLUDE_PATH "usr/local/include/curl")
+include_directories(${CURL_INCLUDE_PATH})
+
+SET(CURL_NAMES ${CURL_NAMES} libcurl.so)
+FIND_LIBRARY(CURL_LIBRARY NAMES ${CURL_NAMES}
+	PATHS
+	/usr/local/lib
+	/home/noha/Documents/UniversityofFreiburg/MasterThesis/curl-7.37.0/
+)
+
+MESSAGE(STATUS "Found cUrl: ${CURL_LIBRARY}")
+
+set(LIBS ${LIBS} ${CURL_LIBRARY})
+
+message(STATUS "linked libs: ${LIBS}")
+
+
+add_executable(Main src/main.cpp)
+add_executable(CurlWrapper src/CURLWrapper.cpp)
+#add_executable(NMAlg src/nm_algorithm.cpp)
+target_link_libraries(Main ${LIBS})
+target_link_libraries(CurlWrapper ${LIBS})
+#target_link_libraries(NMAlg ${LIBS})
+# Link against the required libraries in OpenCV >=2.2
+IF(OPENCV2_FOUND)
+    SET( OPENCV2_INSTALLED 1)
+    message( STATUS "Using OpenCV >= 2.2" )
+	IF(WIN32)
+		IF(MINGW)
+			TARGET_LINK_LIBRARIES(Main ${OPENCV2_LIBS})
+			#TARGET_LINK_LIBRARIES(NMAlg ${OPENCV2_LIBS})
+		ELSE(MINGW)
+			FOREACH (LIB ${OPENCV2_DEBUG_LIBS})
+				TARGET_LINK_LIBRARIES(Main
+				debug ${LIB})
+				#TARGET_LINK_LIBRARIES(NMAlg debug ${LIB})
+			ENDFOREACH(LIB)
+			FOREACH (LIB ${OPENCV2_RELEASE_LIBS})
+				TARGET_LINK_LIBRARIES(Main
+				optimized ${LIB})
+				#TARGET_LINK_LIBRARIES(NMAlg optimized ${LIB})
+			ENDFOREACH(LIB)
+		ENDIF(MINGW)
+	ELSE(WIN32)
+		TARGET_LINK_LIBRARIES(Main opencv_highgui opencv_core opencv_features2d opencv_imgproc)
+		#TARGET_LINK_LIBRARIES(NMAlg opencv_objdetect opencv_highgui opencv_core opencv_features2d opencv_imgproc)
+	ENDIF(WIN32)
+ENDIF(OPENCV2_FOUND)
