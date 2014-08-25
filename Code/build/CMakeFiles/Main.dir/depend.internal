@@ -3,6 +3,7 @@
 
 CMakeFiles/Main.dir/src/main.cpp.o
  ../libccv/lib/ccv.h
+ /home/noha/Documents/UniversityofFreiburg/MasterThesis/Code/include/CURLWrapper.h
  /home/noha/Documents/UniversityofFreiburg/MasterThesis/Code/include/ccv.hpp
  /home/noha/Documents/UniversityofFreiburg/MasterThesis/Code/include/main.hpp
  /home/noha/Documents/UniversityofFreiburg/MasterThesis/Code/src/main.cpp
@@ -13,6 +14,8 @@ CMakeFiles/Main.dir/src/main.cpp.o
  /usr/local/include/curl/easy.h
  /usr/local/include/curl/multi.h
  /usr/local/include/curl/typecheck-gcc.h
+ /usr/local/include/jansson.h
+ /usr/local/include/jansson_config.h
  /usr/local/include/leptonica/allheaders.h
  /usr/local/include/leptonica/alltypes.h
  /usr/local/include/leptonica/array.h

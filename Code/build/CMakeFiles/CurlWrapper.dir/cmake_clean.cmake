@@ -1,7 +1,7 @@
 FILE(REMOVE_RECURSE
   "CMakeFiles/CurlWrapper.dir/src/CURLWrapper.cpp.o"
-  "bin/CurlWrapper.pdb"
-  "bin/CurlWrapper"
+  "lib/libCurlWrapper.pdb"
+  "lib/libCurlWrapper.so"
 )
 
 # Per-language clean rules from dependency scanning.

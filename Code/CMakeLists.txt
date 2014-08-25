@@ -77,14 +77,32 @@ MESSAGE(STATUS "Found cUrl: ${CURL_LIBRARY}")
 
 set(LIBS ${LIBS} ${CURL_LIBRARY})
 
+#find jansson
+set(JANSSON_INCLUDE_PATH "usr/local/include")
+include_directories(${JANSSON_INCLUDE_PATH})
+
+set(JANSSON_NAMES ${JANSSON_NAMES} libjansson.a)
+FIND_LIBRARY(JANSSON_LIBRARY NAMES ${JANSSON_NAMES}
+	PATHS
+	/usr/local/lib
+	/home/noha/Documents/UniversityofFreiburg/MasterThesis/jansson-2.6/
+)
+
+MESSAGE(STATUS "Found Jansson: ${JANSSON_LIBRARY}")
+
+set(LIBS ${LIBS} ${JANSSON_LIBRARY})
+
+
 message(STATUS "linked libs: ${LIBS}")
 
+#add the CURLWrapper files
+add_library(CurlWrapper SHARED src/CURLWrapper.cpp)
 
+#add_executable(CurlWrapper src/CURLWrapper.cpp)
 add_executable(Main src/main.cpp)
-add_executable(CurlWrapper src/CURLWrapper.cpp)
 #add_executable(NMAlg src/nm_algorithm.cpp)
-target_link_libraries(Main ${LIBS})
-target_link_libraries(CurlWrapper ${LIBS})
+#target_link_libraries(CurlWrapper ${LIBS})
+target_link_libraries(Main ${LIBS} CurlWrapper)
 #target_link_libraries(NMAlg ${LIBS})
 # Link against the required libraries in OpenCV >=2.2
 IF(OPENCV2_FOUND)

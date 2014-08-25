@@ -90,6 +90,8 @@ bin/Main: /usr/local/lib/libpng.so
 bin/Main: /usr/local/lib/libtesseract.so
 bin/Main: /usr/local/lib/liblept.so
 bin/Main: /usr/local/lib/libcurl.so
+bin/Main: /usr/local/lib/libjansson.a
+bin/Main: lib/libCurlWrapper.so
 bin/Main: CMakeFiles/Main.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --red --bold "Linking CXX executable bin/Main"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/Main.dir/link.txt --verbose=$(VERBOSE)

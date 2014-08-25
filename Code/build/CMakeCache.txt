@@ -185,6 +185,12 @@ Code_BINARY_DIR:STATIC=/home/noha/Documents/UniversityofFreiburg/MasterThesis/Co
 //Value Computed by CMake
 Code_SOURCE_DIR:STATIC=/home/noha/Documents/UniversityofFreiburg/MasterThesis/Code
 
+//Dependencies for target
+CurlWrapper_LIB_DEPENDS:STATIC=
+
+//Path to a library.
+JANSSON_LIBRARY:FILEPATH=/usr/local/lib/libjansson.a
+
 //Path to a file.
 JPEG_INCLUDE_DIR:PATH=/usr/local/include
 

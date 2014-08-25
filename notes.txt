@@ -48,5 +48,5 @@ Status Update 21/08:
 --thought about using dictionary checks with probablistic background to correct the tesseract output string
 --thought about completely relying on google api for character substitutions/croppings
 --is it useful to not load the system-generated dictionary from tesseract in the case of recognizing names of streets/shops to increase the recognition value or not (needs inspection)
---using the google api to search for the text returned from the previous action ===> a) api uses javascript (how to integrate)
+--using the google api to search for the text returned from the previous action ===> a) api uses javascript DONE!
 																					 b) could use place searches 

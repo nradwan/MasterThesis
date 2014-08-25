@@ -10,6 +10,7 @@ SET(CMAKE_CXX_COMPILER_ID "GNU")
 
 # Targets to which this target links.
 SET(CMAKE_TARGET_LINKED_INFO_FILES
+  "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Code/build/CMakeFiles/CurlWrapper.dir/DependInfo.cmake"
   )
 
 # The include file search paths:
@@ -20,6 +21,7 @@ SET(CMAKE_C_TARGET_INCLUDE_PATH
   "/usr/local/include/tesseract"
   "/usr/local/include/leptonica"
   "../usr/local/include/curl"
+  "../usr/local/include"
   )
 SET(CMAKE_CXX_TARGET_INCLUDE_PATH ${CMAKE_C_TARGET_INCLUDE_PATH})
 SET(CMAKE_Fortran_TARGET_INCLUDE_PATH ${CMAKE_C_TARGET_INCLUDE_PATH})
