@@ -1,4 +1,5 @@
 #include "../include/main.hpp"
+using namespace boost::gil;
 
 int main(int argc, char** argv)
 {
@@ -9,11 +10,25 @@ int main(int argc, char** argv)
 	}
 	
 	return 0;*/
-	double latit = atof(argv[1]);
+	
+	/*double latit = atof(argv[1]);
 	double longit = atof(argv[2]);
 	std::pair<double, double > location (latit, longit);
-	nearbySearch(location, argv[3]);
+	std::vector<Place > results = nearbySearch(location, argv[3]);
+	std::cout << "returned results size: " << results.size() << std::endl;
+	for(std::vector<Place >::iterator it = results.begin(); it!=results.end(); ++it){
+		std::cout << it->name << ": " << it->longitude << "," << it->latitude << std::endl;
+	}
+	return 0;*/
 	
+	/*std::cout << logoFound(argv[1], argv[2]) << std::endl;
+	return 0;*/
+	
+	Place p;
+	p.place_icon = "http://static.freepik.com/free-photo/hrc-siberian-tiger-2-jpg_21253111.jpg";
+	savePlaceIcon(p);
+	
+	std::cout << p.place_icon << std::endl;
 }
 
 std::vector<CvRect > spotText(char* input_im){
@@ -106,7 +121,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 	std::stringstream ss;
 	ss << "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=";
 	ss << location.first << "," << location.second;
-	ss << "&rankby=distance&keyword=" << keyword << "&key=APIKEY";
+	ss << "&rankby=distance&keyword=" << keyword << "&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM";
 	std::string url = ss.str();
 	std::cout << "Will retrive from url: '" << url << "'" << std::endl;
 	//retrieve results from cUrl
@@ -151,7 +166,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 				return nearbyLocs;
 			}
 			//loop over the results array
-			json_t *data, *geometry, *location, *longit, *latit, *icon;
+			json_t *data, *geometry, *location, *longit, *latit, *icon, *name;
 			for(size_t i = 0; i<json_array_size(results); i++){
 				data = json_array_get(results, i);
 				//get the icon
@@ -161,11 +176,15 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 				location = json_object_get(geometry, "location");
 				longit = json_object_get(location, "lng");
 				latit = json_object_get(location, "lat");
+				//get the name
+				name = json_object_get(data, "name");
 				//create new place
 				Place curr;
 				curr.place_icon = json_string_value(icon);
 				curr.longitude = json_real_value(longit);
 				curr.latitude = json_real_value(latit);
+				curr.name = json_string_value(name);
+				savePlaceIcon(curr);
 				nearbyLocs.push_back(curr);
 			}
 			
@@ -181,4 +200,129 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 		return nearbyLocs;
 	}
 	return nearbyLocs;
+}
+
+bool logoFound(char* logo_im, char* input_im){
+	cv::Mat img_1 = cv::imread( logo_im, CV_LOAD_IMAGE_GRAYSCALE );
+	cv::Mat img_2 = cv::imread( input_im, CV_LOAD_IMAGE_GRAYSCALE );
+	
+	if( !img_1.data || !img_2.data ){
+		std::cout<< " --(!) Error reading images " << std::endl; return -1;
+	}
+
+	//-- Step 1: Detect the keypoints using SURF Detector
+	int minHessian = 400;
+
+	cv::SurfFeatureDetector detector( minHessian );
+
+	std::vector<cv::KeyPoint> keypoints_1, keypoints_2;
+
+	detector.detect( img_1, keypoints_1 );
+	detector.detect( img_2, keypoints_2 );
+
+	//-- Step 2: Calculate descriptors (feature vectors)
+	cv::SurfDescriptorExtractor extractor;
+
+	cv::Mat descriptors_1, descriptors_2;
+
+	extractor.compute( img_1, keypoints_1, descriptors_1 );
+	extractor.compute( img_2, keypoints_2, descriptors_2 );
+
+	//-- Step 3: Matching descriptor vectors using FLANN matcher
+	cv::FlannBasedMatcher matcher;
+	std::vector< cv::DMatch > matches;
+	matcher.match( descriptors_1, descriptors_2, matches );
+
+	double max_dist = 0; double min_dist = 100;
+
+	//-- Quick calculation of max and min distances between keypoints
+	for( int i = 0; i < descriptors_1.rows; i++ ){ 
+		double dist = matches[i].distance;
+		if( dist < min_dist ) min_dist = dist;
+		if( dist > max_dist ) max_dist = dist;
+	}
+
+	//printf("-- Max dist : %f \n", max_dist );
+	//printf("-- Min dist : %f \n", min_dist );
+
+	//-- Draw only "good" matches (i.e. whose distance is less than 2*min_dist,
+	//-- or a small arbitary value ( 0.02 ) in the event that min_dist is very
+	//-- small)
+	//-- PS.- radiusMatch can also be used here.
+	std::vector< cv::DMatch > good_matches;
+
+	for( int i = 0; i < descriptors_1.rows; i++ ){ 
+		if( matches[i].distance <= std::max(2*min_dist, 0.02) ){ 
+			good_matches.push_back( matches[i]); 
+		}
+	}
+
+	//-- Draw only "good" matches
+	cv::Mat img_matches;
+	drawMatches(img_1, keypoints_1, img_2, keypoints_2,
+				good_matches, img_matches, cv::Scalar::all(-1), cv::Scalar::all(-1),
+				std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+
+	//-- Show detected matches
+	imshow( "Good Matches", img_matches );
+
+	std::cout << "all matches: " << (int)matches.size() << " good matches: " << (double)good_matches.size()/(double)matches.size() << std::endl;
+
+	for( int i = 0; i < (int)good_matches.size(); i++ )
+	{ printf( "-- Good Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, good_matches[i].queryIdx, good_matches[i].trainIdx ); }
+
+	cv::waitKey(0);
+
+	
+	return (double)good_matches.size()/(double)matches.size()>0.5;
+}
+
+void savePlaceIcon(Place& place){
+	CURL *image; 
+	CURLcode imgresult; 
+	FILE *fp; 
+
+	//preprocess the image name
+	std::string image_url = place.place_icon;
+	std::string image_name;
+	unsigned found = image_url.find_last_of("/");
+	image_name = image_url.substr(found+1);
+	
+	std::string new_image_path = saved_logos_prefix+image_name;
+
+	image = curl_easy_init(); 
+	if( image ){ 
+		// Open file 
+		fp = fopen(new_image_path.c_str(), "wb"); 
+		if( fp == NULL ) std::cout << "File cannot be opened"; 
+
+		curl_easy_setopt(image, CURLOPT_URL, image_url.c_str()); 
+		curl_easy_setopt(image, CURLOPT_WRITEFUNCTION, NULL); 
+		curl_easy_setopt(image, CURLOPT_WRITEDATA, fp); 
+
+
+		// Grab image 
+		imgresult = curl_easy_perform(image); 
+		if( imgresult ){ 
+		    std::cout << "Cannot grab the image!\n"; 
+		} 
+	} 
+
+	// Clean up the resources 
+	curl_easy_cleanup(image); 
+	// Close the file 
+	fclose(fp); 
+	
+	//check if the image is in jpg (if yes we need to convert it to png)
+	if(image_name.find("jpg")!=std::string::npos || image_name.find("jpeg")!=std::string::npos){
+		unsigned found = image_name.find_last_of(".");
+		rgb8_image_t im;
+		jpeg_read_image(new_image_path, im);
+		png_write_view(saved_logos_prefix+image_name.substr(0,found+1)+"png", view(im));
+		new_image_path = saved_logos_prefix+image_name.substr(0,found+1)+"png";
+	}
+	
+	//save the new image icon location in the places struct
+	place.place_icon = new_image_path;
+	return;
 }
