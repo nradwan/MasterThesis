@@ -24,11 +24,21 @@ int main(int argc, char** argv)
 	/*std::cout << logoFound(argv[1], argv[2]) << std::endl;
 	return 0;*/
 	
-	Place p;
-	p.place_icon = "http://static.freepik.com/free-photo/hrc-siberian-tiger-2-jpg_21253111.jpg";
+	/*Place p;
+	p.name = "test";
+	std::string x = getPhotoRef("CnRmAAAAFR8pjw0S0k2KdOhdHRJAf_zC5aAZMP7Ecf-Awzc3basCr3eoCTivtir6TDG_L02lxvlufw_K3u-MlCzJE_06Tgfl7gi3yeDmt_8d5Udj5PN6j8IccAuKgg28wfuuv57CfgvvT7dI1ezZl6CWyYGM_RIQcj4OHhxFgcBJrIYapQva6hoUhCyx01dj_on1A0Q9Fd80vpR04aw");
+	std::cout << x << std::endl;
+	std::vector<std::string> pl;
+	pl.push_back(x);
+	p.place_icon = pl;
 	savePlaceIcon(p);
 	
-	std::cout << p.place_icon << std::endl;
+	for(std::vector<std::string>::iterator it= p.place_icon.begin(); it!=p.place_icon.end(); ++it){
+		std::cout << *it << std::endl;
+	}*/
+	
+	std::cout << ocrCorrection(argv[1]) << std::endl;
+	return 0;
 }
 
 std::vector<CvRect > spotText(char* input_im){
@@ -166,11 +176,19 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 				return nearbyLocs;
 			}
 			//loop over the results array
-			json_t *data, *geometry, *location, *longit, *latit, *icon, *name;
+			json_t *data, *geometry, *location, *longit, *latit, *photos, *photo, *photo_ref, *name;
+			std::vector<std::string> photo_url;
 			for(size_t i = 0; i<json_array_size(results); i++){
 				data = json_array_get(results, i);
 				//get the icon
-				icon = json_object_get(data, "icon");
+				photos = json_object_get(data, "photos");
+				//loop over the photos array
+				for(size_t j = 0; j<json_array_size(photos); j++){
+					photo = json_array_get(photos, j);
+					photo_ref = json_object_get(photo, "photo_reference");
+					//call method to return photo query
+					photo_url.push_back(getPhotoRef(json_string_value(photo_ref)));
+				}
 				//get lang and latit
 				geometry = json_object_get(data, "geometry");
 				location = json_object_get(geometry, "location");
@@ -180,7 +198,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 				name = json_object_get(data, "name");
 				//create new place
 				Place curr;
-				curr.place_icon = json_string_value(icon);
+				curr.place_icon = photo_url;
 				curr.longitude = json_real_value(longit);
 				curr.latitude = json_real_value(latit);
 				curr.name = json_string_value(name);
@@ -266,7 +284,8 @@ bool logoFound(char* logo_im, char* input_im){
 	//-- Show detected matches
 	imshow( "Good Matches", img_matches );
 
-	std::cout << "all matches: " << (int)matches.size() << " good matches: " << (double)good_matches.size()/(double)matches.size() << std::endl;
+	std::cout << "all matches: " << (int)matches.size() << " good matches: " <<  
+				(int)good_matches.size() << " ratio: " << (double)good_matches.size()/(double)matches.size() << std::endl;
 
 	for( int i = 0; i < (int)good_matches.size(); i++ )
 	{ printf( "-- Good Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, good_matches[i].queryIdx, good_matches[i].trainIdx ); }
@@ -274,7 +293,7 @@ bool logoFound(char* logo_im, char* input_im){
 	cv::waitKey(0);
 
 	
-	return (double)good_matches.size()/(double)matches.size()>0.5;
+	return (double)good_matches.size()/(double)matches.size()>0.4;
 }
 
 void savePlaceIcon(Place& place){
@@ -282,47 +301,134 @@ void savePlaceIcon(Place& place){
 	CURLcode imgresult; 
 	FILE *fp; 
 
-	//preprocess the image name
-	std::string image_url = place.place_icon;
-	std::string image_name;
-	unsigned found = image_url.find_last_of("/");
-	image_name = image_url.substr(found+1);
+	int counter = 0;
+	for(std::vector<std::string>::iterator it= place.place_icon.begin(); it!=place.place_icon.end(); ++it){
+		//preprocess the image name
+		std::string image_url = *it;
+		std::string image_name;
+		unsigned found = image_url.find_last_of("/");
+		image_name = image_url.substr(found+1);
+		found = image_name.find_last_of(".");
+		std::stringstream ss;
+		ss << place.name << "_" << counter << image_name.substr(found);
+		image_name = ss.str();
 	
-	std::string new_image_path = saved_logos_prefix+image_name;
+		std::string new_image_path = saved_logos_prefix+image_name;
 
-	image = curl_easy_init(); 
-	if( image ){ 
-		// Open file 
-		fp = fopen(new_image_path.c_str(), "wb"); 
-		if( fp == NULL ) std::cout << "File cannot be opened"; 
+		image = curl_easy_init(); 
+		if( image ){ 
+			// Open file 
+			fp = fopen(new_image_path.c_str(), "wb"); 
+			if( fp == NULL ) std::cout << "File cannot be opened"; 
 
-		curl_easy_setopt(image, CURLOPT_URL, image_url.c_str()); 
-		curl_easy_setopt(image, CURLOPT_WRITEFUNCTION, NULL); 
-		curl_easy_setopt(image, CURLOPT_WRITEDATA, fp); 
+			curl_easy_setopt(image, CURLOPT_URL, image_url.c_str()); 
+			curl_easy_setopt(image, CURLOPT_WRITEFUNCTION, NULL); 
+			curl_easy_setopt(image, CURLOPT_WRITEDATA, fp); 
 
 
-		// Grab image 
-		imgresult = curl_easy_perform(image); 
-		if( imgresult ){ 
-		    std::cout << "Cannot grab the image!\n"; 
+			// Grab image 
+			imgresult = curl_easy_perform(image); 
+			if( imgresult ){ 
+				std::cout << "Cannot grab the image!\n"; 
+			} 
 		} 
-	} 
 
-	// Clean up the resources 
-	curl_easy_cleanup(image); 
-	// Close the file 
-	fclose(fp); 
+		// Clean up the resources 
+		curl_easy_cleanup(image); 
+		// Close the file 
+		fclose(fp); 
+		
+		std::cout << "image grabbed and saved" << std::endl;
+		
+		//check if the image is in jpg (if yes we need to convert it to png)
+		if(image_name.find("jpg")!=std::string::npos || image_name.find("jpeg")!=std::string::npos){
+			unsigned found = image_name.find_last_of(".");
+			rgb8_image_t im;
+			jpeg_read_image(new_image_path, im);
+			png_write_view(saved_logos_prefix+image_name.substr(0,found+1)+"png", view(im));
+			new_image_path = saved_logos_prefix+image_name.substr(0,found+1)+"png";
+		}
 	
-	//check if the image is in jpg (if yes we need to convert it to png)
-	if(image_name.find("jpg")!=std::string::npos || image_name.find("jpeg")!=std::string::npos){
-		unsigned found = image_name.find_last_of(".");
-		rgb8_image_t im;
-		jpeg_read_image(new_image_path, im);
-		png_write_view(saved_logos_prefix+image_name.substr(0,found+1)+"png", view(im));
-		new_image_path = saved_logos_prefix+image_name.substr(0,found+1)+"png";
+		//save the new image icon location in the places struct
+		place.place_icon[counter] = new_image_path;
+		
+		counter++;
+	}
+	return;
+}
+
+std::string getPhotoRef(std::string photo_ref){
+	std::stringstream ss;
+	ss << "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=" << photo_ref 
+		<< "&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM";
+	std::string url = ss.str();
+						
+	char* return_url;
+						
+	CURL* curl;
+	CURLcode curl_res;
+	curl_global_init(CURL_GLOBAL_ALL);
+	curl = curl_easy_init();
+	if(curl){
+		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+		curl_easy_setopt(curl, CURLOPT_NOBODY, 1);
+		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+		curl_res = curl_easy_perform(curl);
+		
+		if(curl_res==CURLE_OK){
+			curl_res = curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL , &return_url);
+			if(curl_res!=CURLE_OK)
+				std::cout << "curl error by getting redirect url" << std::endl;
+		}
+		else{
+			std::cout << "curl error" << std::endl;
+		}	
+	
 	}
 	
-	//save the new image icon location in the places struct
-	place.place_icon = new_image_path;
-	return;
+	return return_url;
+}
+
+std::string ocrCorrection(std::string query){
+	std::stringstream ss;
+	ss << "https://www.googleapis.com/customsearch/v1?q=" << query 
+		<< "+zurich&cx=014594212095381448740%3A2kyeah__gum&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM";
+	std::string url = ss.str();
+	//std::cout << url << std::endl;
+	//retrieve results from cUrl
+    CURLWrapper::Easy easy;
+    easy.SetOption(CURLOPT_URL, url.c_str());
+    easy.SetOption(CURLOPT_HEADER, 0);
+    easy.SetOption(CURLOPT_FOLLOWLOCATION, 1);
+    easy.SetOption(CURLOPT_WRITEFUNCTION, writer);
+    easy.SetOption(CURLOPT_WRITEDATA, &buffer);
+    easy.Perform();
+	//load the results with jansson
+	json_t *root;
+    json_error_t error;
+    
+    root = json_loads(buffer.c_str(), 0, &error);
+	buffer = "";
+	
+	//check if reply from cUrl is ok
+	if(easy.IsOK()){
+		if(!root)
+		{
+			//fprintf(stderr, "error: on line %d: %s\n", error.line, error.text);
+			std::cout << "error! " << error.line << " " << error.text << std::endl;
+			return "";
+		}
+		json_t *spelling, *corrected_query;
+		//get the returned status
+		spelling = json_object_get(root, "spelling");
+		corrected_query = json_object_get(spelling, "correctedQuery");
+		if(corrected_query)
+			return json_string_value(corrected_query);
+		else return "";
+		
+	}
+	else{
+		std::cout << "failed to perform with cUrl" << std::endl;
+		return "";
+	}
 }

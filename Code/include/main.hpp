@@ -37,7 +37,7 @@
 struct Place{
 	double longitude;
 	double latitude;
-	std::string place_icon;
+	std::vector<std::string> place_icon;
 	std::string name;
 };
 
@@ -51,3 +51,5 @@ static int writer(char *data, size_t size, size_t nmemb, std::string *buffer);
 std::vector<Place> nearbySearch(std::pair<double, double> location, std::string keyword);
 bool logoFound(char* logo_im, char* input_im);
 void savePlaceIcon(Place& place);
+std::string getPhotoRef(std::string photo_ref);
+std::string ocrCorrection(std::string query);
