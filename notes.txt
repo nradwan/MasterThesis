@@ -51,12 +51,18 @@ Status Update 21/08:
 																					 b) could use place searches DONE!
 																					 c) need to fix api key DONE!
 --maybe merge the output of the textspotting (merge the bounding boxes) to get better outcome?
---thought about use probabilistic error correction for words resulting from Tesseract (see Posner paper) (NEEDS TO BE DONE)
+--thought about use probabilistic error correction for words resulting from Tesseract (see Posner paper) ==>needs training data, not understood
 --thought about contacting authors of paper to get Street View Dataset they used in their validation (DONE but data in US not zurich)
 --try to match the logo you get from the nearby search results with anything in the image to see if we are at this location or not using sift features DONE!
 --download new data to start the search on (NEEDS TO BE DONE)
 --we cannot use the photo result currently used as it returns an image from the map not of the true place. Try using the search api for photos instead DONE!
 --also consider using the logopedia output for the place (NEEDS TO BE DONE)
 --could happen that ocr identifies correctly but the place is simply not listed
---consider using google search to correct the api output DONE!
---prepare entire example to show next time (NEEDS TO BE DONE)
+--consider using google search to correct the api output DONE! PS Must link words from ocr by "+"
+--prepare entire example to show next time DONE
+--need to handle any exceptions thrown DONE!
+--how do we handle the output from multiple boxes? concatenate into one word or split into several? Maybe depending on distance between bounding boxes, maybe handeled on it's own from the search api DONE
+--also need to handle cases where the search returns no results at all, in case of very noisy ocr results DONE
+--tokenize the search into maximal 3 terms together (in case results from ocr is more than 3 boxes), perform text correction on them first! DONE
+--PROBLEM: correction step may not correct all text and then we would get trouble in nearby place search phase
+--Possible solution: do nearby search on permutations of maximum 3 words.

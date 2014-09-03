@@ -4,7 +4,7 @@ using namespace boost::gil;
 int main(int argc, char** argv)
 {
 	/*std::vector<CvRect > recog_text = spotText(argv[1]);
-	std::vector<std::pair<char*, int > > detection = performOcr(recog_text, argv[1], argv[2], argv[3]);
+	std::vector<std::pair<char*, int > > detection = performOcr(recog_text, argv[1]);
 	for(std::vector<std::pair<char*, int > >::iterator it = detection.begin(); it!=detection.end(); ++it){
 		std::cout << "text: " << it->first << " ,confidence: " << it->second << std::endl;
 	}
@@ -25,22 +25,126 @@ int main(int argc, char** argv)
 	return 0;*/
 	
 	/*Place p;
-	p.name = "test";
-	std::string x = getPhotoRef("CnRmAAAAFR8pjw0S0k2KdOhdHRJAf_zC5aAZMP7Ecf-Awzc3basCr3eoCTivtir6TDG_L02lxvlufw_K3u-MlCzJE_06Tgfl7gi3yeDmt_8d5Udj5PN6j8IccAuKgg28wfuuv57CfgvvT7dI1ezZl6CWyYGM_RIQcj4OHhxFgcBJrIYapQva6hoUhCyx01dj_on1A0Q9Fd80vpR04aw");
+	p.name = "Parianos Reisen - Griechenland aus erster Hand";
+	std::string x = "https://lh6.googleusercontent.com/--6U-bNF7ua8/UlLeto7pCxI/AAAAAAAAMWA/UK9hfha-Bk8/s1600-w145/photo.jpg";//getPhotoRef("CnRmAAAAwC8bEPLw3sACDGvDqRU0ZycG2hq7PoTcmo33FC0B3c5qaHN0EkRZvfsXf7IojVZVOvR56s_1iBJJyUt8tD0Gz8uiT9IrK0w19vpoDvoXzIHxLTaxLFkaZ0-1Qy5CIO7druFe6FZGFC9xNEO588Wi5hIQt7hVB6OzKd8cusZUlD0NMBoUim0UyMHN7gSLrBp__TpIJBMOxYQ");
 	std::cout << x << std::endl;
 	std::vector<std::string> pl;
 	pl.push_back(x);
 	p.place_icon = pl;
 	savePlaceIcon(p);
-	
 	for(std::vector<std::string>::iterator it= p.place_icon.begin(); it!=p.place_icon.end(); ++it){
 		std::cout << *it << std::endl;
 	}*/
 	
-	std::cout << ocrCorrection(argv[1]) << std::endl;
+
+	/*std::cout << ocrCorrection(argv[1]) << std::endl;
+	return 0;*/
+	
+	run(argv[1]);
+	/*std::vector<std::string> elems;
+	elems.push_back("1");
+	elems.push_back("2");
+	elems.push_back("3");
+	elems.push_back("4");
+	elems.push_back("5");
+	std::vector<std::string> result = getCombinations(elems);
+	for(std::vector<std::string>::iterator it=result.begin(); it!=result.end(); ++it)
+		std::cout << *it << std::endl;*/
 	return 0;
 }
-
+void run(char* input_im){
+	//first call spotText
+	std::vector<CvRect> bounding_boxes = spotText(input_im);
+	//do ocr on the bounding boxes
+	std::vector<std::pair<char*, int > > detected_text = performOcr(bounding_boxes, input_im);
+	//do ocr correction step
+	//first concatenate all detected text with "+" separator instead of " "
+	std::string concatenated_text;
+	for(std::vector<std::pair<char*, int > >::iterator it = detected_text.begin();
+			it!=detected_text.end(); ++it){
+			concatenated_text += it->first;
+			concatenated_text += "+";
+	}
+	//replace any remaining " " by "+"
+	std::replace(concatenated_text.begin(), concatenated_text.end(), ' ', '+');
+	//std::cout << "search query for: " << concatenated_text << std::endl;
+	//call ocrCorrection
+	std::string corrected_text = ocrCorrection(concatenated_text);
+	//check if there was any correction made or not
+	if(corrected_text.compare("")==0)
+		corrected_text = concatenated_text;
+	
+	//split the corrected text by " "
+	std::vector<std::string> tokenized_text;
+	boost::split(tokenized_text, corrected_text, boost::is_any_of(" +"));
+	//for(std::vector<std::string>::iterator it = tokenized_text.begin(); it!=tokenized_text.end(); ++it)
+		//std::cout << *it << std::endl;
+	
+	//replace any remaining " " by "+"
+	std::replace(corrected_text.begin(), corrected_text.end(), ' ', '+');
+	//std::cout << "corrected text: " << corrected_text << std::endl;
+	
+	//get nearby places
+	//first process name of image to get lat and long
+	std::string image_name = input_im;
+	size_t start_pos = image_name.find_first_of('_');
+	size_t end_pos = image_name.find_last_of('.');
+	std::string location = image_name.substr(start_pos+1, end_pos);
+	size_t split = location.find(',');
+	double latitude = atof(location.substr(0, split).c_str());
+	double longitude = atof(location.substr(split+1).c_str());
+	std::pair<double, double > gps_loc (latitude, longitude);
+	//call get nearby places method
+	std::vector<Place> nearby_places = nearbySearch(gps_loc, corrected_text);
+	//loop over the returned places to try and get the matched location
+	for(std::vector<Place>::iterator it = nearby_places.begin(); 
+			it!=nearby_places.end(); ++it){
+		std::cout << "current place possible location: " << it->name << std::endl;
+		//save the picture reference of the array
+		savePlaceIcon(*it);
+		//loop over the returned pictures and try to see if they match the current location
+		for(std::vector<std::string>::iterator ij = it->place_icon.begin();
+				ij!=it->place_icon.end(); ++ij){
+			//try to match the logo with the current image
+			bool true_match = logoFound(&(*ij)[0], input_im);
+			std::string x = true_match ? "a ":"not a ";
+			std::cout << it->name << " is " << x << "possible match to input image" << std::endl;		
+			return;
+		}	
+	}
+	//if nearbySearch returned zero results then we need to get possible combinations of 
+	//search query and repeat the search with that
+	if(nearby_places.size()==0){
+		std::vector<std::string> combination_queries = getCombinations(tokenized_text);
+		//loop over the combination_queries and call each of them with the results
+		for(std::vector<std::string>::iterator it = combination_queries.begin();
+				it!=combination_queries.end(); ++it){
+			nearby_places = nearbySearch(gps_loc, *it);
+			std::cout << "size: " << nearby_places.size() << std::endl;
+			if(nearby_places.size() == 0)
+				continue;
+			//otherwise loop over the returned places to try and get a matched location
+			for(std::vector<Place>::iterator ij = nearby_places.begin(); ij!=nearby_places.end(); ++ij){
+				std::cout << "current place possible location: " << ij->name << std::endl;
+				//save the picture reference of the array
+				if(ij->place_icon.size()>0){
+					//loop over the returned places
+					for(std::vector<std::string>::iterator ik = ij->place_icon.begin(); ik!=ij->place_icon.end(); ++ik){
+						bool true_match = logoFound(&(*ik)[0], input_im);
+						std::string x = true_match ? "a ":"not a ";
+						std::cout << ij->name << " is " << x << "possible match to input image" << std::endl;
+						return;
+					}
+				}
+				else{
+					std::cout << ij->name << " has no photo references" << std::endl;
+				}
+			}		
+		}
+	}
+	
+	return;
+}
 std::vector<CvRect > spotText(char* input_im){
 	std::vector<CvRect > text_rect;
 	//read the image
@@ -75,14 +179,17 @@ std::vector<CvRect > spotText(char* input_im){
     return text_rect;
 }
 
-std::vector<std::pair<char*, int> > performOcr(std::vector<CvRect > bounding_boxes, 
-									char* input_im, char* tess_data_path, char* language){
+std::vector<std::pair<char*, int> > performOcr(std::vector<CvRect > bounding_boxes, char* input_im){
+	
+	char* tess_data_path = TESSDATA_PATH_;
+	char* language = DETECTION_LANGUAGE_;
 	std::vector<std::pair<char*, int> > detected_text;
 	//read the picture
 	Pix *image = pixRead(input_im);
 	//initialize tesseract api
 	tesseract::TessBaseAPI *api = new tesseract::TessBaseAPI();
 	api->Init(tess_data_path, language, tesseract::OEM_TESSERACT_ONLY);
+	//api->ReadConfigFile(CONFIG_FILE_);
 	api->SetImage(image);
 	//tesseract example approach
 	//Boxa* boxes = api->GetComponentImages(tesseract::RIL_TEXTLINE, true, NULL, NULL);
@@ -103,11 +210,13 @@ std::vector<std::pair<char*, int> > performOcr(std::vector<CvRect > bounding_box
 		api->SetRectangle(it->x, it->y, it->width, it->height);
 		//get text result
 		char* ocrResult = api->GetUTF8Text();
+		//remove new lines
+		*std::remove(ocrResult, ocrResult+strlen(ocrResult), '\n') = '\0';
 		//get confidence
 		int conf = api->MeanTextConf();
 		std::pair<char* , int > detection (ocrResult, conf);
 		detected_text.push_back(detection);
-		fprintf(stdout, "Box: x=%d, y=%d, w=%d, h=%d, confidence: %d, text: %s", it->x, it->y, it->width, it->height, conf, ocrResult);
+		fprintf(stdout, "Box: x=%d, y=%d, w=%d, h=%d, confidence: %d, text: %s\n", it->x, it->y, it->width, it->height, conf, ocrResult);
 	}
 	return detected_text;
 }
@@ -178,17 +287,24 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 			//loop over the results array
 			json_t *data, *geometry, *location, *longit, *latit, *photos, *photo, *photo_ref, *name;
 			std::vector<std::string> photo_url;
+			std::cout << "results size: " << json_array_size(results) << std::endl;
 			for(size_t i = 0; i<json_array_size(results); i++){
 				data = json_array_get(results, i);
 				//get the icon
 				photos = json_object_get(data, "photos");
-				//loop over the photos array
-				for(size_t j = 0; j<json_array_size(photos); j++){
-					photo = json_array_get(photos, j);
-					photo_ref = json_object_get(photo, "photo_reference");
-					//call method to return photo query
-					photo_url.push_back(getPhotoRef(json_string_value(photo_ref)));
+				if(!json_is_array(photos)){
+					std::cout << "error: no photos array found" << std::endl;
 				}
+				else{
+					//loop over the photos array
+					for(size_t j = 0; j<json_array_size(photos); j++){
+						photo = json_array_get(photos, j);
+						photo_ref = json_object_get(photo, "photo_reference");
+						//call method to return photo query
+						photo_url.push_back(getPhotoRef(json_string_value(photo_ref)));
+					}
+				}
+				std::cout << "finished photos loop" << std::endl;
 				//get lang and latit
 				geometry = json_object_get(data, "geometry");
 				location = json_object_get(geometry, "location");
@@ -203,6 +319,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 				curr.latitude = json_real_value(latit);
 				curr.name = json_string_value(name);
 				savePlaceIcon(curr);
+				std::cout << "finished savePlaceIcon" << std::endl;
 				nearbyLocs.push_back(curr);
 			}
 			
@@ -225,7 +342,7 @@ bool logoFound(char* logo_im, char* input_im){
 	cv::Mat img_2 = cv::imread( input_im, CV_LOAD_IMAGE_GRAYSCALE );
 	
 	if( !img_1.data || !img_2.data ){
-		std::cout<< " --(!) Error reading images " << std::endl; return -1;
+		std::cout<< " --(!) Error reading images " << std::endl; return false;
 	}
 
 	//-- Step 1: Detect the keypoints using SURF Detector
@@ -306,12 +423,14 @@ void savePlaceIcon(Place& place){
 		//preprocess the image name
 		std::string image_url = *it;
 		std::string image_name;
+		std::cout << "image_url: " << image_url << std::endl;
 		unsigned found = image_url.find_last_of("/");
 		image_name = image_url.substr(found+1);
 		found = image_name.find_last_of(".");
 		std::stringstream ss;
 		ss << place.name << "_" << counter << image_name.substr(found);
 		image_name = ss.str();
+		std::replace(image_name.begin(), image_name.end(), ' ', '_');
 	
 		std::string new_image_path = saved_logos_prefix+image_name;
 
@@ -330,21 +449,27 @@ void savePlaceIcon(Place& place){
 			imgresult = curl_easy_perform(image); 
 			if( imgresult ){ 
 				std::cout << "Cannot grab the image!\n"; 
+				return;
 			} 
 		} 
+		else{
+			std::cout << "curl error" << std::endl;
+			return;
+		}
 
 		// Clean up the resources 
 		curl_easy_cleanup(image); 
 		// Close the file 
 		fclose(fp); 
 		
-		std::cout << "image grabbed and saved" << std::endl;
 		
 		//check if the image is in jpg (if yes we need to convert it to png)
 		if(image_name.find("jpg")!=std::string::npos || image_name.find("jpeg")!=std::string::npos){
 			unsigned found = image_name.find_last_of(".");
 			rgb8_image_t im;
 			jpeg_read_image(new_image_path, im);
+			//std::cout << saved_logos_prefix+image_name.substr(0,found+1)+"png" << std::endl;
+			//view(im);
 			png_write_view(saved_logos_prefix+image_name.substr(0,found+1)+"png", view(im));
 			new_image_path = saved_logos_prefix+image_name.substr(0,found+1)+"png";
 		}
@@ -385,14 +510,13 @@ std::string getPhotoRef(std::string photo_ref){
 		}	
 	
 	}
-	
 	return return_url;
 }
 
 std::string ocrCorrection(std::string query){
 	std::stringstream ss;
 	ss << "https://www.googleapis.com/customsearch/v1?q=" << query 
-		<< "+zurich&cx=014594212095381448740%3A2kyeah__gum&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM";
+		<< "&cx=014594212095381448740%3A2kyeah__gum&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM";
 	std::string url = ss.str();
 	//std::cout << url << std::endl;
 	//retrieve results from cUrl
@@ -421,6 +545,8 @@ std::string ocrCorrection(std::string query){
 		json_t *spelling, *corrected_query;
 		//get the returned status
 		spelling = json_object_get(root, "spelling");
+		if(!spelling)
+			return "";
 		corrected_query = json_object_get(spelling, "correctedQuery");
 		if(corrected_query)
 			return json_string_value(corrected_query);
@@ -432,3 +558,29 @@ std::string ocrCorrection(std::string query){
 		return "";
 	}
 }
+
+std::vector<std::string> getCombinations(std::vector<std::string> tokens){
+	std::vector<std::string> combin;
+	for(int i=tokens.size()-1; i>0; i--){
+		combinationRec(tokens, i, 0, 0, "", combin);
+	}	
+	return combin;
+}
+
+void combinationRec(std::vector<std::string> &words, int max_len, int curr_size, int curr_start, std::string curr_word, std::vector<std::string> &result){
+	if(curr_size==max_len){
+		//std::cout << curr_word << std::endl;
+		result.push_back(curr_word);
+		return;
+	}
+	
+	if(words.size()-curr_start < max_len-curr_size)
+		return;
+	
+	std::string x;
+	for(int i=curr_start; i<words.size(); i++){
+		x = curr_word+"+"+words[i];
+		combinationRec(words, max_len, curr_size+1, i+1, x, result);
+	}
+}
+

@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <algorithm>
+#include <boost/algorithm/string.hpp>
 
 #include "../include/ccv.hpp"
 
@@ -42,14 +43,20 @@ struct Place{
 };
 
 std::string saved_logos_prefix = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Logos/";
+char* TESSDATA_PATH_ = "/usr/local/share/tessdata/";
+char* DETECTION_LANGUAGE_ = "deu+deu-frak+eng";
+char* CONFIG_FILE_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/tesseract-3.03/tessdata/tessconfigs/specialconfig";
 
 static std::string buffer;
 
 std::vector<CvRect > spotText(char* input_im);
-std::vector<std::pair<char*, int> > performOcr(std::vector<CvRect > bounding_boxes, char* input_im, char* tess_data_path, char* language);
+std::vector<std::pair<char*, int> > performOcr(std::vector<CvRect > bounding_boxes, char* input_im);
 static int writer(char *data, size_t size, size_t nmemb, std::string *buffer);
 std::vector<Place> nearbySearch(std::pair<double, double> location, std::string keyword);
 bool logoFound(char* logo_im, char* input_im);
 void savePlaceIcon(Place& place);
 std::string getPhotoRef(std::string photo_ref);
 std::string ocrCorrection(std::string query);
+void run(char* input_im);
+std::vector<std::string> getCombinations(std::vector<std::string> tokens);
+void combinationRec(std::vector<std::string> &words, int max_len, int curr_size, int curr_start, std::string curr_word, std::vector<std::string> &result);
