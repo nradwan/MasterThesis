@@ -56,7 +56,7 @@ Status Update 21/08:
 --try to match the logo you get from the nearby search results with anything in the image to see if we are at this location or not using sift features DONE!
 --download new data to start the search on (NEEDS TO BE DONE)
 --we cannot use the photo result currently used as it returns an image from the map not of the true place. Try using the search api for photos instead DONE!
---also consider using the logopedia output for the place (NEEDS TO BE DONE)
+--also consider using the logopedia output for the place (NEEDS TO BE DONE) ==>would have same problem as below!
 --could happen that ocr identifies correctly but the place is simply not listed
 --consider using google search to correct the api output DONE! PS Must link words from ocr by "+"
 --prepare entire example to show next time DONE
@@ -66,3 +66,7 @@ Status Update 21/08:
 --tokenize the search into maximal 3 terms together (in case results from ocr is more than 3 boxes), perform text correction on them first! DONE
 --PROBLEM: correction step may not correct all text and then we would get trouble in nearby place search phase
 --Possible solution: do nearby search on permutations of maximum 3 words.
+--PROBLEM: photos by google are not always useful in identifying the place as sometimes it's just the logo of the place which is not visible in the image. Resulting in matching with wrong matches even when the correct place was in the result.
+--PROBLEM: need to find better way instead of calling all computations as it eventually gets expensive.
+--Maybe use Franken+ to train tesseract but not sure if it's compatible on linux or not.
+

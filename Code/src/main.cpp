@@ -96,31 +96,38 @@ void run(char* input_im){
 	std::pair<double, double > gps_loc (latitude, longitude);
 	//call get nearby places method
 	std::vector<Place> nearby_places = nearbySearch(gps_loc, corrected_text);
+	bool no_photos = true;
+	//std::cout << nearby_places.size() << std::endl;
 	//loop over the returned places to try and get the matched location
 	for(std::vector<Place>::iterator it = nearby_places.begin(); 
 			it!=nearby_places.end(); ++it){
 		std::cout << "current place possible location: " << it->name << std::endl;
 		//save the picture reference of the array
 		savePlaceIcon(*it);
+		//std::cout << "here!" << std::endl;
+		//std::cout << it->place_icon.size() << std::endl;
+		if(it->place_icon.size()>0)
+			no_photos = false;
 		//loop over the returned pictures and try to see if they match the current location
 		for(std::vector<std::string>::iterator ij = it->place_icon.begin();
 				ij!=it->place_icon.end(); ++ij){
 			//try to match the logo with the current image
 			bool true_match = logoFound(&(*ij)[0], input_im);
 			std::string x = true_match ? "a ":"not a ";
-			std::cout << it->name << " is " << x << "possible match to input image" << std::endl;		
-			return;
+			std::cout << it->name << " is " << x << "possible match to input image" << std::endl;	
+			if(true_match)	
+				return;
 		}	
 	}
 	//if nearbySearch returned zero results then we need to get possible combinations of 
 	//search query and repeat the search with that
-	if(nearby_places.size()==0){
+	if(nearby_places.size()==0 || no_photos){
 		std::vector<std::string> combination_queries = getCombinations(tokenized_text);
 		//loop over the combination_queries and call each of them with the results
 		for(std::vector<std::string>::iterator it = combination_queries.begin();
 				it!=combination_queries.end(); ++it){
 			nearby_places = nearbySearch(gps_loc, *it);
-			std::cout << "size: " << nearby_places.size() << std::endl;
+			//std::cout << "size: " << nearby_places.size() << std::endl;
 			if(nearby_places.size() == 0)
 				continue;
 			//otherwise loop over the returned places to try and get a matched location
@@ -133,7 +140,8 @@ void run(char* input_im){
 						bool true_match = logoFound(&(*ik)[0], input_im);
 						std::string x = true_match ? "a ":"not a ";
 						std::cout << ij->name << " is " << x << "possible match to input image" << std::endl;
-						return;
+						if(true_match)
+							return;
 					}
 				}
 				else{
@@ -242,7 +250,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 	ss << location.first << "," << location.second;
 	ss << "&rankby=distance&keyword=" << keyword << "&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM";
 	std::string url = ss.str();
-	std::cout << "Will retrive from url: '" << url << "'" << std::endl;
+	//std::cout << "Will retrive from url: '" << url << "'" << std::endl;
 	//retrieve results from cUrl
     CURLWrapper::Easy easy;
     easy.SetOption(CURLOPT_URL, url.c_str());
@@ -287,7 +295,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 			//loop over the results array
 			json_t *data, *geometry, *location, *longit, *latit, *photos, *photo, *photo_ref, *name;
 			std::vector<std::string> photo_url;
-			std::cout << "results size: " << json_array_size(results) << std::endl;
+			//std::cout << "results size: " << json_array_size(results) << std::endl;
 			for(size_t i = 0; i<json_array_size(results); i++){
 				data = json_array_get(results, i);
 				//get the icon
@@ -304,7 +312,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 						photo_url.push_back(getPhotoRef(json_string_value(photo_ref)));
 					}
 				}
-				std::cout << "finished photos loop" << std::endl;
+				//std::cout << "finished photos loop" << std::endl;
 				//get lang and latit
 				geometry = json_object_get(data, "geometry");
 				location = json_object_get(geometry, "location");
@@ -319,7 +327,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 				curr.latitude = json_real_value(latit);
 				curr.name = json_string_value(name);
 				savePlaceIcon(curr);
-				std::cout << "finished savePlaceIcon" << std::endl;
+				//std::cout << "finished savePlaceIcon" << std::endl;
 				nearbyLocs.push_back(curr);
 			}
 			
@@ -423,10 +431,14 @@ void savePlaceIcon(Place& place){
 		//preprocess the image name
 		std::string image_url = *it;
 		std::string image_name;
-		std::cout << "image_url: " << image_url << std::endl;
+		//std::cout << "image_url: " << image_url << std::endl;
 		unsigned found = image_url.find_last_of("/");
+		if(found >= image_url.length())
+			continue;
 		image_name = image_url.substr(found+1);
 		found = image_name.find_last_of(".");
+		if(found >= image_name.length())
+			continue;
 		std::stringstream ss;
 		ss << place.name << "_" << counter << image_name.substr(found);
 		image_name = ss.str();
