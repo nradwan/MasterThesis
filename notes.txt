@@ -68,5 +68,8 @@ Status Update 21/08:
 --Possible solution: do nearby search on permutations of maximum 3 words.
 --PROBLEM: photos by google are not always useful in identifying the place as sometimes it's just the logo of the place which is not visible in the image. Resulting in matching with wrong matches even when the correct place was in the result.
 --PROBLEM: need to find better way instead of calling all computations as it eventually gets expensive.
+--PROBLEM: sometimes the place doesn't have an associated photo.
 --Maybe use Franken+ to train tesseract but not sure if it's compatible on linux or not.
+--Do the other way around, search the area around the gps location and get the matching places, then try to see which matches best with the ocr result we get (NEEDS TO BE DONE)
+--Integrate the hunspell dictionary to get word corrections/suggestions--maybe can help in the matching phase?/useful also as we only get 100 requests allowed per day for the custom search api to do the spell correction (NEEDS TO BE DONE *& investigated*)
 

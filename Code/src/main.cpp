@@ -3,13 +3,13 @@ using namespace boost::gil;
 
 int main(int argc, char** argv)
 {
-	/*std::vector<CvRect > recog_text = spotText(argv[1]);
+	std::vector<CvRect > recog_text = spotText(argv[1]);
 	std::vector<std::pair<char*, int > > detection = performOcr(recog_text, argv[1]);
 	for(std::vector<std::pair<char*, int > >::iterator it = detection.begin(); it!=detection.end(); ++it){
 		std::cout << "text: " << it->first << " ,confidence: " << it->second << std::endl;
 	}
 	
-	return 0;*/
+	return 0;
 	
 	/*double latit = atof(argv[1]);
 	double longit = atof(argv[2]);
@@ -40,7 +40,7 @@ int main(int argc, char** argv)
 	/*std::cout << ocrCorrection(argv[1]) << std::endl;
 	return 0;*/
 	
-	run(argv[1]);
+	//run(argv[1]);
 	/*std::vector<std::string> elems;
 	elems.push_back("1");
 	elems.push_back("2");
@@ -50,6 +50,8 @@ int main(int argc, char** argv)
 	std::vector<std::string> result = getCombinations(elems);
 	for(std::vector<std::string>::iterator it=result.begin(); it!=result.end(); ++it)
 		std::cout << *it << std::endl;*/
+
+	//reverseSearch(argv[1], argv[2]);
 	return 0;
 }
 void run(char* input_im){
@@ -153,6 +155,87 @@ void run(char* input_im){
 	
 	return;
 }
+
+void reverseSearch(char* input_im, std::string search_word){
+	//first process name of image to get lat and long
+	std::string image_name = input_im;
+	size_t start_pos = image_name.find_first_of('_');
+	size_t end_pos = image_name.find_last_of('.');
+	std::string location = image_name.substr(start_pos+1, end_pos);
+	size_t split = location.find(',');
+	double latitude = atof(location.substr(0, split).c_str());
+	double longitude = atof(location.substr(split+1).c_str());
+	std::pair<double, double > gps_loc (latitude, longitude);
+	//call nearbySearch with the given search word
+	std::vector<Place> possible_locs = nearbySearch(gps_loc, search_word);
+	//call text-spotting for the image
+	std::vector<CvRect > bounding_boxes = spotText(input_im);
+	//call tesseract for the output
+	std::vector<std::pair<char*, int> > detected_words = performOcr(bounding_boxes, input_im);
+	//do ocr correction step
+	//first concatenate all detected text with "+" separator instead of " "
+	std::string concatenated_text;
+	for(std::vector<std::pair<char*, int > >::iterator it = detected_words.begin();
+			it!=detected_words.end(); ++it){
+			concatenated_text += it->first;
+			concatenated_text += "+";
+	}
+	//replace any remaining " " by "+"
+	std::replace(concatenated_text.begin(), concatenated_text.end(), ' ', '+');
+	//call ocrCorrection
+	std::string corrected_text = ocrCorrection(concatenated_text);
+	//check if there was any correction made or not
+	if(corrected_text.compare("")==0)
+		corrected_text = concatenated_text;
+	//split the corrected text by " " and "+"
+	std::vector<std::string> tokenized_text;
+	boost::split(tokenized_text, corrected_text, boost::is_any_of(" +"));
+	
+	size_t found;
+	//loop over the places result to match the name
+	for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
+		boost::algorithm::to_lower(it->name);
+		//std::cout << it->name << std::endl;
+		//loop over the recognized text words
+		for(std::vector<std::string>::iterator ij=tokenized_text.begin(); ij!=tokenized_text.end(); ++ij){
+			//try to find if the current word is present in the location name
+			boost::algorithm::to_lower(*ij);
+			//std::cout << *ij << std::endl;
+			found = it->name.find(*ij);
+			//std::cout << found << std::endl;
+			if(found!=std::string::npos){
+				//current word was found in the string
+				it->match_score+= ij->length();
+			}
+		}
+	}
+	//order the nearby place results by the matching score 
+	std::sort(possible_locs.begin(), possible_locs.end(), comparePlaces);
+	
+	for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
+		std::cout << it->name << " " << it->match_score << std::endl;
+	}
+	
+	//loop over the ordered results
+	for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
+		std::cout << it->name << " has a match: " << it->match_score << std::endl;
+		//call logo found
+		for(std::vector<std::string>::iterator ij=it->place_icon.begin(); ij!=it->place_icon.end(); ++ij){
+			bool match = logoFound(&(*ij)[0], input_im);
+			std::string x = match ? " ":" not ";
+			std::cout << "Logo confirmation" << x << "found" << std::endl;
+			if(match)
+				break;
+		}
+		std::cout << "Display another result? ";
+		char* answer;
+		std::cin >> answer;
+		if(answer[0]=='n')
+			break;
+	}
+	return;
+}
+
 std::vector<CvRect > spotText(char* input_im){
 	std::vector<CvRect > text_rect;
 	//read the image
@@ -306,12 +389,16 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 				else{
 					//loop over the photos array
 					for(size_t j = 0; j<json_array_size(photos); j++){
+						//std::cout << "beep" << std::endl;
 						photo = json_array_get(photos, j);
 						photo_ref = json_object_get(photo, "photo_reference");
 						//call method to return photo query
 						photo_url.push_back(getPhotoRef(json_string_value(photo_ref)));
+						//std::cout << "boop" << std::endl;
 					}
 				}
+				//std::cout << "here" << std::endl;
+				try{
 				//std::cout << "finished photos loop" << std::endl;
 				//get lang and latit
 				geometry = json_object_get(data, "geometry");
@@ -329,6 +416,11 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 				savePlaceIcon(curr);
 				//std::cout << "finished savePlaceIcon" << std::endl;
 				nearbyLocs.push_back(curr);
+				photo_url.erase(photo_url.begin(), photo_url.end());
+				}
+				catch(std::exception &e){
+					std::cout << e.what() << std::endl;
+				}
 			}
 			
 		}
@@ -342,6 +434,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 		std::cout << "failed to perform with cUrl" << std::endl;
 		return nearbyLocs;
 	}
+	//std::cout << "returning" << std::endl;
 	return nearbyLocs;
 }
 
@@ -409,15 +502,15 @@ bool logoFound(char* logo_im, char* input_im){
 	//-- Show detected matches
 	imshow( "Good Matches", img_matches );
 
-	std::cout << "all matches: " << (int)matches.size() << " good matches: " <<  
-				(int)good_matches.size() << " ratio: " << (double)good_matches.size()/(double)matches.size() << std::endl;
+	//std::cout << "all matches: " << (int)matches.size() << " good matches: " <<  
+		//		(int)good_matches.size() << " ratio: " << (double)good_matches.size()/(double)matches.size() << std::endl;
 
-	for( int i = 0; i < (int)good_matches.size(); i++ )
-	{ printf( "-- Good Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, good_matches[i].queryIdx, good_matches[i].trainIdx ); }
+	//for( int i = 0; i < (int)good_matches.size(); i++ )
+	//{ printf( "-- Good Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, good_matches[i].queryIdx, good_matches[i].trainIdx ); }
 
-	cv::waitKey(0);
+	//cv::waitKey(0);
 
-	
+	std::cout << "match probability: " << (double)good_matches.size()/(double)matches.size() << std::endl;
 	return (double)good_matches.size()/(double)matches.size()>0.4;
 }
 
@@ -443,8 +536,11 @@ void savePlaceIcon(Place& place){
 		ss << place.name << "_" << counter << image_name.substr(found);
 		image_name = ss.str();
 		std::replace(image_name.begin(), image_name.end(), ' ', '_');
-	
+		std::replace(image_name.begin(), image_name.end(), '/', '_');
+		
 		std::string new_image_path = saved_logos_prefix+image_name;
+		//std::cout << saved_logos_prefix << " " << image_name << std::endl;
+		//std::cout << new_image_path << std::endl;
 
 		image = curl_easy_init(); 
 		if( image ){ 
@@ -456,9 +552,10 @@ void savePlaceIcon(Place& place){
 			curl_easy_setopt(image, CURLOPT_WRITEFUNCTION, NULL); 
 			curl_easy_setopt(image, CURLOPT_WRITEDATA, fp); 
 
-
+			//std::cout << "setup done" << std::endl;
 			// Grab image 
 			imgresult = curl_easy_perform(image); 
+			//std::cout << "grabbing image" << std::endl;
 			if( imgresult ){ 
 				std::cout << "Cannot grab the image!\n"; 
 				return;
@@ -491,6 +588,7 @@ void savePlaceIcon(Place& place){
 		
 		counter++;
 	}
+	//std::cout << "finished savePlaceIcon and returning" << std::endl;
 	return;
 }
 

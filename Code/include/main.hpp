@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
+#include <exception>
 
 #include "../include/ccv.hpp"
 
@@ -40,6 +41,7 @@ struct Place{
 	double latitude;
 	std::vector<std::string> place_icon;
 	std::string name;
+	int match_score;
 };
 
 std::string saved_logos_prefix = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Logos/";
@@ -60,3 +62,7 @@ std::string ocrCorrection(std::string query);
 void run(char* input_im);
 std::vector<std::string> getCombinations(std::vector<std::string> tokens);
 void combinationRec(std::vector<std::string> &words, int max_len, int curr_size, int curr_start, std::string curr_word, std::vector<std::string> &result);
+void reverseSearch(char* input_im, std::string search_word);
+bool comparePlaces(const Place &a, const Place &b){
+	return (a.match_score>b.match_score);
+}
