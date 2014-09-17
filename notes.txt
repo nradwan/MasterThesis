@@ -70,6 +70,34 @@ Status Update 21/08:
 --PROBLEM: need to find better way instead of calling all computations as it eventually gets expensive.
 --PROBLEM: sometimes the place doesn't have an associated photo.
 --Maybe use Franken+ to train tesseract but not sure if it's compatible on linux or not.
---Do the other way around, search the area around the gps location and get the matching places, then try to see which matches best with the ocr result we get (NEEDS TO BE DONE)
+--Do the other way around, search the area around the gps location and get the matching places, then try to see which matches best with the ocr result we get DONE
 --Integrate the hunspell dictionary to get word corrections/suggestions--maybe can help in the matching phase?/useful also as we only get 100 requests allowed per day for the custom search api to do the spell correction (NEEDS TO BE DONE *& investigated*)
-
+--Take a street with lots of shops, then run the query sequentially on data from walking in the street, and run/implement kalman filter to localize and smooth the results. 
+	--STEPS::
+			++download data from lots of shops in one street
+			++implement method to take the data sequentially from them
+			++implement kalman filter
+	--Notes for kalman filter:
+			++create file that has longitude/latitude of each timestep followed by image name that corresponds to it (in order of visiting)
+			++the observations from the nearby place search
+			++we need to specify keywords that would be working for the nearby search
+			++use less noise for odometry than for observations as they're not really accurate depending on the text spotting and the ocr step DONE
+			++implement motion model DONE
+			++implement correction step DONE
+			++convert gps to xytheta DONE
+			++Observation is the location of the shop, and the odometry is the gps coordinates when we took the picture minus gps coordinates of where we took the previous picture
+			++increase the size of the matrix as we go and initialize them!! (Needs to be done in main method!!)
+			++implement main method
+			++test motion model (simple testing) DONE
+			++test correction step (simple testing) DONE
+	--IN THE MAIN METHOD:
+			++loop over the data file
+			++data file should be filled with the gps coordinates
+			++convert them to odometry
+			++call the motion model
+			++load the picture then call the nearby search with the keyword
+			++adjust the nearby search to return gps location
+			++get the location from the returned result
+			++convert to odometry
+			++call the correction step
+			

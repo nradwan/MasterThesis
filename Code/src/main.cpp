@@ -3,13 +3,13 @@ using namespace boost::gil;
 
 int main(int argc, char** argv)
 {
-	std::vector<CvRect > recog_text = spotText(argv[1]);
+	/*std::vector<CvRect > recog_text = spotText(argv[1]);
 	std::vector<std::pair<char*, int > > detection = performOcr(recog_text, argv[1]);
 	for(std::vector<std::pair<char*, int > >::iterator it = detection.begin(); it!=detection.end(); ++it){
 		std::cout << "text: " << it->first << " ,confidence: " << it->second << std::endl;
 	}
 	
-	return 0;
+	return 0;*/
 	
 	/*double latit = atof(argv[1]);
 	double longit = atof(argv[2]);
@@ -52,6 +52,17 @@ int main(int argc, char** argv)
 		std::cout << *it << std::endl;*/
 
 	//reverseSearch(argv[1], argv[2]);
+	
+	/*MatrixXd m;
+	m = MatrixXd::Zero(3,3);
+	m << 1, 2, 3,
+	4, 5, 6,
+	7, 8, 9;
+	
+	m.conservativeResize(5,5);
+	std::cout << m << std::endl;*/
+	
+	runKalmanFilter();
 	return 0;
 }
 void run(char* input_im){
@@ -570,7 +581,7 @@ void savePlaceIcon(Place& place){
 		curl_easy_cleanup(image); 
 		// Close the file 
 		fclose(fp); 
-		
+
 		
 		//check if the image is in jpg (if yes we need to convert it to png)
 		if(image_name.find("jpg")!=std::string::npos || image_name.find("jpeg")!=std::string::npos){
@@ -694,3 +705,107 @@ void combinationRec(std::vector<std::string> &words, int max_len, int curr_size,
 	}
 }
 
+Odometry getOdom(std::pair<double, double> pt1, std::pair<double, double> pt2){
+	//calculate the distance
+	double earth_radius = 6371000; //earth radius in meters
+	double phi1 = pt1.first * M_PI / 180;
+	double phi2 = pt2.first * M_PI / 180;
+	double delta_phi = (pt2.first - pt1.first) * M_PI / 180;
+	double delta_lambda = (pt2.second - pt1.second) * M_PI / 180;
+	double a = sin(delta_phi/2) * sin(delta_phi/2) + cos(phi1) * cos(phi2) * sin(delta_lambda/2) * sin(delta_lambda/2);
+	double c = 2 * atan2(sqrt(a), sqrt(1-a));
+	double dist = earth_radius * c;
+	
+	//calculate the angle
+	double y1 = sin(delta_lambda) * cos(phi2);
+	double x1 = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(delta_lambda);
+	double initial_angle = atan2(y1, x1);
+
+	double delta_lambda2 = (pt1.second - pt2.second) * M_PI / 180;
+	double y2 = sin(delta_lambda2) * cos(phi2);
+	double x2 = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(delta_lambda2);
+	double final_angle = atan2(y2, x2);
+	
+	Odometry result;
+	result.dist = dist;
+	result.theta1 = initial_angle;
+	result.theta2 = final_angle;
+	return result; 
+}
+
+double normalize_angle(double angle){
+	while(angle>M_PI)
+		angle = angle - 2 * M_PI;
+	while(angle<-1*M_PI)
+		angle = angle + 2*M_PI;
+	return angle;
+}
+
+Pose motionModel(Pose curr_pose, Odometry motion){
+	curr_pose.mu(0) = curr_pose.mu(0) + motion.dist * cos(curr_pose.mu(2) + motion.theta1);
+	curr_pose.mu(1) = curr_pose.mu(1) + motion.dist * sin(curr_pose.mu(2) + motion.theta1);
+	curr_pose.mu(2) = normalize_angle(curr_pose.mu(2) + motion.theta1 + motion.theta2);
+	
+	double noise = 0.1;
+	MatrixXd motion_noise (3,3);
+	motion_noise(0,0) = noise;
+	motion_noise(1,1) = noise;
+	motion_noise(2,2) = noise/10;
+	motion_noise.conservativeResize(curr_pose.sigma.rows(), curr_pose.sigma.cols());
+	
+	curr_pose.sigma = curr_pose.sigma + motion_noise;
+	return curr_pose;
+}
+
+Pose correctionStep(Pose estim_pose, std::vector<Location> observs){
+	//assume that the size of both mu and sigma was already adjusted in the main kalman filter function
+	//so we do not do it here!
+	int num_observ = observs.size();
+	MatrixXd C = MatrixXd::Identity(2*num_observ, estim_pose.sigma.rows());
+	MatrixXd sensor_noise = 0.01*MatrixXd::Identity(2*num_observ, 2*num_observ);
+	MatrixXd kalman_gain = MatrixXd::Zero(estim_pose.sigma.rows(), 2*num_observ);
+	kalman_gain = estim_pose.sigma * C.transpose() * (( C * estim_pose.sigma * C.transpose() + sensor_noise).inverse());
+	
+	//create matrix for the difference in location
+	MatrixXd difference = MatrixXd::Zero(2*num_observ, 1);
+	int idx = 0;
+	//loop over the observations and compute the difference between the expected pose and the actual pose
+	for(std::vector<Location>::iterator it = observs.begin(); it!=observs.end(); ++it){	
+		difference(idx) = it->x - estim_pose.mu(0);
+		difference(idx+1) = it->y - estim_pose.mu(1);
+		idx += 2;
+	}
+	estim_pose.mu = estim_pose.mu + kalman_gain * difference;
+	MatrixXd ident = MatrixXd::Identity(estim_pose.sigma.rows(), estim_pose.sigma.cols());
+	estim_pose.sigma = (ident - kalman_gain * C) * estim_pose.sigma;
+	return estim_pose;
+}
+
+void runKalmanFilter(){
+	//open data file
+	std::string file_loc_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Code/test/odometry.dat";
+	std::ifstream data_file;
+	data_file.open(file_loc_.c_str(), std::ios::in);
+	//create an initial pose
+	Pose robot_pose;
+	robot_pose.mu = MatrixXd::Zero(3,1);
+	robot_pose.sigma = MatrixXd::Zero(3,3);
+	//loop over the data file
+	std::string line;
+	Odometry odom;
+	if(data_file.is_open()){
+		while(std::getline(data_file, line)){
+			std::stringstream ss (line);
+			ss >> odom.theta1;
+			ss >> odom.dist;
+			ss >> odom.theta2;
+			//call the motion model
+			robot_pose = motionModel(robot_pose, odom);
+			//call the correction step
+			//TODO: fill with actual data
+			std::vector<Location> observs;
+			robot_pose = correctionStep(robot_pose, observs);
+			std::cout << robot_pose.mu << "\n" << std::endl;
+		}
+	}
+}

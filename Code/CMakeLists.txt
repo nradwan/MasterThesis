@@ -92,6 +92,9 @@ MESSAGE(STATUS "Found Jansson: ${JANSSON_LIBRARY}")
 
 set(LIBS ${LIBS} ${JANSSON_LIBRARY})
 
+#find eigen
+find_package(Eigen3 REQUIRED)
+include_directories(${EIGEN3_INCLUDE_DIR})
 
 message(STATUS "linked libs: ${LIBS}")
 

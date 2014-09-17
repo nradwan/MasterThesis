@@ -33,6 +33,13 @@
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <exception>
+#include <fstream>
+#define _USE_MATH_DEFINES
+#include <math.h>
+
+#include <Eigen/Dense>
+#include <Eigen/LU>
+using Eigen::MatrixXd;
 
 #include "../include/ccv.hpp"
 
@@ -42,6 +49,22 @@ struct Place{
 	std::vector<std::string> place_icon;
 	std::string name;
 	int match_score;
+};
+
+struct Odometry{
+	double dist;
+	double theta1;
+	double theta2;
+};
+
+struct Pose{
+	MatrixXd mu;
+	MatrixXd sigma;
+};
+
+struct Location{
+	double x;
+	double y;
 };
 
 std::string saved_logos_prefix = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Logos/";
@@ -66,3 +89,8 @@ void reverseSearch(char* input_im, std::string search_word);
 bool comparePlaces(const Place &a, const Place &b){
 	return (a.match_score>b.match_score);
 }
+Odometry getOdom(std::pair<double, double> pt1, std::pair<double, double> pt2);
+Pose motionModel(Pose curr_pose, Odometry motion);
+double normalize_angle(double angle);
+Pose correctionStep(Pose estim_pose, std::vector<Location> observs);
+void runKalmanFilter();
