@@ -75,8 +75,9 @@ Status Update 21/08:
 --Take a street with lots of shops, then run the query sequentially on data from walking in the street, and run/implement kalman filter to localize and smooth the results. 
 	--STEPS::
 			++download data from lots of shops in one street
-			++implement method to take the data sequentially from them
-			++implement kalman filter
+			++implement method to take the data sequentially from them DONE
+			++implement kalman filter DONE
+			++implement visualization method
 	--Notes for kalman filter:
 			++create file that has longitude/latitude of each timestep followed by image name that corresponds to it (in order of visiting)
 			++the observations from the nearby place search
@@ -86,18 +87,30 @@ Status Update 21/08:
 			++implement correction step DONE
 			++convert gps to xytheta DONE
 			++Observation is the location of the shop, and the odometry is the gps coordinates when we took the picture minus gps coordinates of where we took the previous picture
-			++increase the size of the matrix as we go and initialize them!! (Needs to be done in main method!!)
-			++implement main method
+			++increase the size of the matrix as we go and initialize them!! (DONE, but only by 1 as we have just 1 observation per step)
+			++implement main method DONE
 			++test motion model (simple testing) DONE
 			++test correction step (simple testing) DONE
-	--IN THE MAIN METHOD:
-			++loop over the data file
-			++data file should be filled with the gps coordinates
-			++convert them to odometry
-			++call the motion model
-			++load the picture then call the nearby search with the keyword
-			++adjust the nearby search to return gps location
-			++get the location from the returned result
-			++convert to odometry
-			++call the correction step
+			--IN THE MAIN METHOD:
+					++loop over the data file
+					++data file should be filled with the gps coordinates (need one datapoint extra for initialization)
+					++convert them to odometry
+					++call the motion model
+					++load the picture then call the nearby search with the keyword
+					++adjust the nearby search to return gps location
+					++get the location from the returned result
+					++convert to odometry
+					++call the correction step
+			++TESTING AND CREATING THE FILES
+	++Visualization:
+		--connect qt to the project DONE
+		--create an interface for viewing the image from the google static maps DONE
+		--create a function that adds a new point connecting it to a path from the code DONE
+		--always append to the url you have currently the newly added value DONE
+		--call the function from the code everytime a new point has been calculated
+		--static maps from google maps, to highlight the path DONE
+	++Notes:
+			--think about multiple keywords being integrated
+			--maybe having multiple observations (right now we just get only the best search place result)
+	
 			

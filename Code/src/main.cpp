@@ -167,7 +167,7 @@ void run(char* input_im){
 	return;
 }
 
-void reverseSearch(char* input_im, std::string search_word){
+Place reverseSearch(char* input_im, std::string search_word){
 	//first process name of image to get lat and long
 	std::string image_name = input_im;
 	size_t start_pos = image_name.find_first_of('_');
@@ -244,7 +244,9 @@ void reverseSearch(char* input_im, std::string search_word){
 		if(answer[0]=='n')
 			break;
 	}
-	return;
+	//return the best place
+	Place best_match = *(possible_locs.begin());
+	return best_match;
 }
 
 std::vector<CvRect > spotText(char* input_im){
@@ -746,7 +748,7 @@ Pose motionModel(Pose curr_pose, Odometry motion){
 	curr_pose.mu(1) = curr_pose.mu(1) + motion.dist * sin(curr_pose.mu(2) + motion.theta1);
 	curr_pose.mu(2) = normalize_angle(curr_pose.mu(2) + motion.theta1 + motion.theta2);
 	
-	double noise = 0.1;
+	double noise = 0.01;
 	MatrixXd motion_noise (3,3);
 	motion_noise(0,0) = noise;
 	motion_noise(1,1) = noise;
@@ -762,7 +764,7 @@ Pose correctionStep(Pose estim_pose, std::vector<Location> observs){
 	//so we do not do it here!
 	int num_observ = observs.size();
 	MatrixXd C = MatrixXd::Identity(2*num_observ, estim_pose.sigma.rows());
-	MatrixXd sensor_noise = 0.01*MatrixXd::Identity(2*num_observ, 2*num_observ);
+	MatrixXd sensor_noise = 0.1*MatrixXd::Identity(2*num_observ, 2*num_observ);
 	MatrixXd kalman_gain = MatrixXd::Zero(estim_pose.sigma.rows(), 2*num_observ);
 	kalman_gain = estim_pose.sigma * C.transpose() * (( C * estim_pose.sigma * C.transpose() + sensor_noise).inverse());
 	
@@ -793,19 +795,53 @@ void runKalmanFilter(){
 	//loop over the data file
 	std::string line;
 	Odometry odom;
+	std::pair<double, double> previous_gps;
+	std::pair<double, double> curr_gps;
+	Place best_matching_place;
+	std::pair<double, double> observed_gps;
+	Odometry observed_odom;
+	Pose prev_robot_pose;
+	Location observed_loc;
 	if(data_file.is_open()){
+		//get the first datapoint for converting from gps to coordinates
+		std::getline(data_file, line);
+		std::stringstream xs (line);
+		xs >> previous_gps.first;
+		xs >> previous_gps.second;
 		while(std::getline(data_file, line)){
+			//read the current gps from the file
 			std::stringstream ss (line);
-			ss >> odom.theta1;
-			ss >> odom.dist;
-			ss >> odom.theta2;
+			ss >> curr_gps.first;
+			ss >> curr_gps.second;
+			//convert the points to odometry
+			odom = getOdom(previous_gps, curr_gps);
 			//call the motion model
+			prev_robot_pose = robot_pose;
 			robot_pose = motionModel(robot_pose, odom);
+			//get the image name
+			char* input_im;
+			ss >> input_im;
+			//get the search keyword
+			std::string keyword;
+			ss >> keyword;
+			//call the reverseSearch method to get best_matching place
+			best_matching_place = reverseSearch(input_im, keyword);
+			//convert the observed gps to odom
+			observed_gps.first = best_matching_place.latitude;
+			observed_gps.second = best_matching_place.longitude;
+			observed_odom = getOdom(previous_gps, observed_gps);
+			prev_robot_pose = motionModel(prev_robot_pose, observed_odom);
+			observed_loc.x = prev_robot_pose.mu(0);
+			observed_loc.y = prev_robot_pose.mu(1);
+			//resize the mu and sigma to add the observed loc
+			robot_pose.mu.conservativeResize(robot_pose.mu.rows()+1,1);
+			robot_pose.sigma.conservativeResize(robot_pose.sigma.rows()+1, robot_pose.sigma.cols()+1);
 			//call the correction step
-			//TODO: fill with actual data
 			std::vector<Location> observs;
+			observs.push_back(observed_loc);
 			robot_pose = correctionStep(robot_pose, observs);
-			std::cout << robot_pose.mu << "\n" << std::endl;
+			//make the curr_gps the previous
+			previous_gps = curr_gps;
 		}
 	}
 }

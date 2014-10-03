@@ -17,6 +17,34 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "/home/noha/Documents/UniversityofFre
 #set(JPEG_INCLUDE_DIR "/home/noha/Documents/UniversityofFreiburg/MasterThesis/jpeg-9a")
 set(PNG_INCLUDE_DIR "/home/noha/Documents/UniversityofFreiburg/MasterThesis/libpng-1.6.12")
 
+#QT5 stuff
+set(QT_INCLUDE_PATH "/home/noha/Qt/5.3/gcc_64/lib")
+include_directories(${QT_INCLUDE_PATH})
+#set(QTWidget_NAMES ${QTWidget_NAMES} libQt5Widgets.so)
+find_package(Qt5Widgets REQUIRED)
+find_package(Qt5Network REQUIRED)
+#find_package(Qt5Declarative REQUIRED)
+
+include_directories(${Qt5Widgets_INCLUDES})
+include_directories(${Qt5Network_INCLUDES})
+#include_directories(${Qt5Declarative_INCLUDES})
+
+add_definitions(${Qt5Widgets_DEFINITIONS})
+add_definitions(${Qt5Network_DEFINITIONS})
+#add_definitions(${Qt5Declarative_DEFINITIONS})
+
+set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
+set(CMAKE_CXX_FLAGS "${Qt5Network_EXECUTABLE_COMPILE_FLAGS}")
+#set(CMAKE_CXX_FLAGS "${Qt5Declarative_EXECUTABLE_COMPILE_FLAGS}")
+
+#GUI
+SET(Visualization_SOURCES visualization/mainwindow.cpp)
+SET(Visualization_HEADERS visualization/mainwindow.h)
+QT5_WRAP_CPP(Visualization_HEADERS_MOC ${Visualization_HEADERS})
+ADD_DEFINITIONS(-DVisualization_LIBRARY)
+ADD_LIBRARY(Visualization SHARED ${Visualization_SOURCES} ${Visualization_HEADERS_MOC})
+target_link_libraries(Visualization ${Qt5Widgets_LIBRARIES} ${Qt5Network_LIBRARIES})# ${Qt5Declarative_LIBRARIES})
+
 FIND_PACKAGE(OpenCV REQUIRED)
 
 find_package(CCV REQUIRED)
@@ -107,6 +135,7 @@ add_executable(test src/matcher.cpp)
 #add_executable(NMAlg src/nm_algorithm.cpp)
 #target_link_libraries(CurlWrapper ${LIBS})
 target_link_libraries(Main ${LIBS} CurlWrapper)
+target_link_libraries(Main Visualization ${Qt5Widgets_LIBRARIES} ${Qt5Network_LIBRARIES})# ${Qt5Declarative_LIBRARIES})
 target_link_libraries(test ${LIBS})
 #target_link_libraries(NMAlg ${LIBS})
 # Link against the required libraries in OpenCV >=2.2

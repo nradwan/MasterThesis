@@ -22,6 +22,9 @@
 #include "boost/gil/extension/io/jpeg_io.hpp"
 #include "boost/gil/extension/io/png_io.hpp"
 
+//visualization
+#include "../visualization/mainwindow.h"
+
 //ubuntu bug
 #include <pthread.h>
 
@@ -85,7 +88,7 @@ std::string ocrCorrection(std::string query);
 void run(char* input_im);
 std::vector<std::string> getCombinations(std::vector<std::string> tokens);
 void combinationRec(std::vector<std::string> &words, int max_len, int curr_size, int curr_start, std::string curr_word, std::vector<std::string> &result);
-void reverseSearch(char* input_im, std::string search_word);
+Place reverseSearch(char* input_im, std::string search_word);
 bool comparePlaces(const Place &a, const Place &b){
 	return (a.match_score>b.match_score);
 }
