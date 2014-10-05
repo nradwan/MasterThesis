@@ -63,6 +63,8 @@ int main(int argc, char** argv)
 	std::cout << m << std::endl;*/
 	
 	runKalmanFilter();
+	
+	
 	return 0;
 }
 void run(char* input_im){
@@ -167,7 +169,7 @@ void run(char* input_im){
 	return;
 }
 
-Place reverseSearch(char* input_im, std::string search_word){
+Place reverseSearch(const char* input_im, std::string search_word){
 	//first process name of image to get lat and long
 	std::string image_name = input_im;
 	size_t start_pos = image_name.find_first_of('_');
@@ -223,12 +225,12 @@ Place reverseSearch(char* input_im, std::string search_word){
 	//order the nearby place results by the matching score 
 	std::sort(possible_locs.begin(), possible_locs.end(), comparePlaces);
 	
-	for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
+	/*for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
 		std::cout << it->name << " " << it->match_score << std::endl;
-	}
+	}*/
 	
 	//loop over the ordered results
-	for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
+	/*for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
 		std::cout << it->name << " has a match: " << it->match_score << std::endl;
 		//call logo found
 		for(std::vector<std::string>::iterator ij=it->place_icon.begin(); ij!=it->place_icon.end(); ++ij){
@@ -238,18 +240,26 @@ Place reverseSearch(char* input_im, std::string search_word){
 			if(match)
 				break;
 		}
-		std::cout << "Display another result? ";
+		/*std::cout << "Display another result? ";
 		char* answer;
 		std::cin >> answer;
 		if(answer[0]=='n')
 			break;
-	}
+		break;
+	}*/
 	//return the best place
-	Place best_match = *(possible_locs.begin());
+	std::vector<Place>::iterator it = possible_locs.begin();
+	std::cout << "best match: " << it->name << " with score: " << it->match_score << std::endl;
+	Place best_match;
+	best_match.longitude = it->longitude;
+	best_match.latitude = it->latitude;
+	best_match.place_icon = it->place_icon;
+	best_match.name = it->name;
+	best_match.match_score = it->match_score;
 	return best_match;
 }
 
-std::vector<CvRect > spotText(char* input_im){
+std::vector<CvRect > spotText(const char* input_im){
 	std::vector<CvRect > text_rect;
 	//read the image
 	ccv_dense_matrix_t* image = 0;
@@ -275,15 +285,15 @@ std::vector<CvRect > spotText(char* input_im){
 	}
 	ccv_matrix_free(image);
 	//Visualization
-	cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );// Create a window for display.
-    cvShowImage( "Display window", cv_image );                   // Show our image inside it.
+	//cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );// Create a window for display.
+    //cvShowImage( "Display window", cv_image );                   // Show our image inside it.
 
-    cv::waitKey(0);                                          // Wait for a keystroke in the window
+    //cv::waitKey(0);                                          // Wait for a keystroke in the window
     
     return text_rect;
 }
 
-std::vector<std::pair<char*, int> > performOcr(std::vector<CvRect > bounding_boxes, char* input_im){
+std::vector<std::pair<char*, int> > performOcr(std::vector<CvRect > bounding_boxes, const char* input_im){
 	
 	char* tess_data_path = TESSDATA_PATH_;
 	char* language = DETECTION_LANGUAGE_;
@@ -397,7 +407,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 				//get the icon
 				photos = json_object_get(data, "photos");
 				if(!json_is_array(photos)){
-					std::cout << "error: no photos array found" << std::endl;
+					//std::cout << "error: no photos array found" << std::endl;
 				}
 				else{
 					//loop over the photos array
@@ -426,7 +436,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 				curr.longitude = json_real_value(longit);
 				curr.latitude = json_real_value(latit);
 				curr.name = json_string_value(name);
-				savePlaceIcon(curr);
+				//savePlaceIcon(curr);
 				//std::cout << "finished savePlaceIcon" << std::endl;
 				nearbyLocs.push_back(curr);
 				photo_url.erase(photo_url.begin(), photo_url.end());
@@ -451,7 +461,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 	return nearbyLocs;
 }
 
-bool logoFound(char* logo_im, char* input_im){
+bool logoFound(char* logo_im, const char* input_im){
 	cv::Mat img_1 = cv::imread( logo_im, CV_LOAD_IMAGE_GRAYSCALE );
 	cv::Mat img_2 = cv::imread( input_im, CV_LOAD_IMAGE_GRAYSCALE );
 	
@@ -735,6 +745,20 @@ Odometry getOdom(std::pair<double, double> pt1, std::pair<double, double> pt2){
 	return result; 
 }
 
+std::pair<double, double> getGPS(Pose robot_pose, std::pair<double, double> pt1){
+	double dist = sqrt(pow(robot_pose.mu(0), 2)+pow(robot_pose.mu(1),2));
+	double earth_radius = 6371000; //earth radius in meters
+	double delta = (dist / earth_radius);
+	double phi1 = pt1.first * M_PI / 180;
+	double lambda1 = pt1.second * M_PI / 180;
+	double phi2 =  asin(sin(phi1) * cos(delta) + cos(phi1) * sin(delta) * cos(robot_pose.mu(2)));
+	double lambda2 = lambda1 + atan2(sin(robot_pose.mu(2)) * sin(delta) * cos(phi1), cos(delta) - sin(phi1) * sin(phi2));
+	phi2 = phi2 * 180 / M_PI;
+	lambda2 = lambda2 * 180 / M_PI;
+	std::pair<double, double> gps (phi2, lambda2);
+	return gps;
+}
+
 double normalize_angle(double angle){
 	while(angle>M_PI)
 		angle = angle - 2 * M_PI;
@@ -748,7 +772,7 @@ Pose motionModel(Pose curr_pose, Odometry motion){
 	curr_pose.mu(1) = curr_pose.mu(1) + motion.dist * sin(curr_pose.mu(2) + motion.theta1);
 	curr_pose.mu(2) = normalize_angle(curr_pose.mu(2) + motion.theta1 + motion.theta2);
 	
-	double noise = 0.01;
+	double noise = 0.1;
 	MatrixXd motion_noise (3,3);
 	motion_noise(0,0) = noise;
 	motion_noise(1,1) = noise;
@@ -763,8 +787,8 @@ Pose correctionStep(Pose estim_pose, std::vector<Location> observs){
 	//assume that the size of both mu and sigma was already adjusted in the main kalman filter function
 	//so we do not do it here!
 	int num_observ = observs.size();
-	MatrixXd C = MatrixXd::Identity(2*num_observ, estim_pose.sigma.rows());
-	MatrixXd sensor_noise = 0.1*MatrixXd::Identity(2*num_observ, 2*num_observ);
+	MatrixXd C = 0.0*MatrixXd::Identity(2*num_observ, estim_pose.sigma.rows());
+	MatrixXd sensor_noise = MatrixXd::Identity(2*num_observ, 2*num_observ);
 	MatrixXd kalman_gain = MatrixXd::Zero(estim_pose.sigma.rows(), 2*num_observ);
 	kalman_gain = estim_pose.sigma * C.transpose() * (( C * estim_pose.sigma * C.transpose() + sensor_noise).inverse());
 	
@@ -783,9 +807,20 @@ Pose correctionStep(Pose estim_pose, std::vector<Location> observs){
 	return estim_pose;
 }
 
-void runKalmanFilter(){
+int runKalmanFilter(){
+	//initialize visualization
+	int argc = 5;
+	char* argv[5]= {"hello"};
+	QApplication app(argc, argv);
+    QGuiApplication::setApplicationDisplayName(MainWindow::tr("Image Viewer"));
+    QCommandLineParser commandLineParser;
+    commandLineParser.addHelpOption();
+    commandLineParser.addPositionalArgument(MainWindow::tr("[file]"), MainWindow::tr("Image file to open."));
+    commandLineParser.process(QCoreApplication::arguments());
+    MainWindow imageViewer;
+    imageViewer.show();
 	//open data file
-	std::string file_loc_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Code/test/odometry.dat";
+	std::string file_loc_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/odometry.dat";
 	std::ifstream data_file;
 	data_file.open(file_loc_.c_str(), std::ios::in);
 	//create an initial pose
@@ -799,6 +834,7 @@ void runKalmanFilter(){
 	std::pair<double, double> curr_gps;
 	Place best_matching_place;
 	std::pair<double, double> observed_gps;
+	std::pair<double, double> corrected_gps;
 	Odometry observed_odom;
 	Pose prev_robot_pose;
 	Location observed_loc;
@@ -808,24 +844,32 @@ void runKalmanFilter(){
 		std::stringstream xs (line);
 		xs >> previous_gps.first;
 		xs >> previous_gps.second;
+		corrected_gps.first = previous_gps.first;
+		corrected_gps.second = previous_gps.second;
 		while(std::getline(data_file, line)){
+			std::stringstream parser;
+			parser << corrected_gps.first;
+			parser << ",";
+			parser << corrected_gps.second;
+			imageViewer.updateGui(parser.str());
 			//read the current gps from the file
 			std::stringstream ss (line);
 			ss >> curr_gps.first;
 			ss >> curr_gps.second;
+			//get the image name
+			std::string input_im;
+			ss >> input_im;
+			//get the search keyword
+			std::string keyword;
+			ss >> keyword;
 			//convert the points to odometry
 			odom = getOdom(previous_gps, curr_gps);
 			//call the motion model
 			prev_robot_pose = robot_pose;
 			robot_pose = motionModel(robot_pose, odom);
-			//get the image name
-			char* input_im;
-			ss >> input_im;
-			//get the search keyword
-			std::string keyword;
-			ss >> keyword;
 			//call the reverseSearch method to get best_matching place
-			best_matching_place = reverseSearch(input_im, keyword);
+			best_matching_place = reverseSearch(input_im.c_str(), keyword);
+			app.processEvents();
 			//convert the observed gps to odom
 			observed_gps.first = best_matching_place.latitude;
 			observed_gps.second = best_matching_place.longitude;
@@ -833,6 +877,7 @@ void runKalmanFilter(){
 			prev_robot_pose = motionModel(prev_robot_pose, observed_odom);
 			observed_loc.x = prev_robot_pose.mu(0);
 			observed_loc.y = prev_robot_pose.mu(1);
+			std::cout << "loc: " << observed_loc.x << " " << observed_loc.y << std::endl;
 			//resize the mu and sigma to add the observed loc
 			robot_pose.mu.conservativeResize(robot_pose.mu.rows()+1,1);
 			robot_pose.sigma.conservativeResize(robot_pose.sigma.rows()+1, robot_pose.sigma.cols()+1);
@@ -840,8 +885,12 @@ void runKalmanFilter(){
 			std::vector<Location> observs;
 			observs.push_back(observed_loc);
 			robot_pose = correctionStep(robot_pose, observs);
+			//get the new gps
+			corrected_gps = getGPS(robot_pose, previous_gps);
+			std::cout << "corrected_gps: " << corrected_gps.first << " " << corrected_gps.second << std::endl;
 			//make the curr_gps the previous
 			previous_gps = curr_gps;
 		}
 	}
+	return app.exec();
 }

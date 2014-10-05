@@ -24,6 +24,8 @@
 
 //visualization
 #include "../visualization/mainwindow.h"
+#include <QApplication>
+#include <QCommandLineParser>
 
 //ubuntu bug
 #include <pthread.h>
@@ -77,23 +79,24 @@ char* CONFIG_FILE_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/tes
 
 static std::string buffer;
 
-std::vector<CvRect > spotText(char* input_im);
-std::vector<std::pair<char*, int> > performOcr(std::vector<CvRect > bounding_boxes, char* input_im);
+std::vector<CvRect > spotText(const char* input_im);
+std::vector<std::pair<char*, int> > performOcr(std::vector<CvRect > bounding_boxes, const char* input_im);
 static int writer(char *data, size_t size, size_t nmemb, std::string *buffer);
 std::vector<Place> nearbySearch(std::pair<double, double> location, std::string keyword);
-bool logoFound(char* logo_im, char* input_im);
+bool logoFound(char* logo_im, const char* input_im);
 void savePlaceIcon(Place& place);
 std::string getPhotoRef(std::string photo_ref);
 std::string ocrCorrection(std::string query);
 void run(char* input_im);
 std::vector<std::string> getCombinations(std::vector<std::string> tokens);
 void combinationRec(std::vector<std::string> &words, int max_len, int curr_size, int curr_start, std::string curr_word, std::vector<std::string> &result);
-Place reverseSearch(char* input_im, std::string search_word);
+Place reverseSearch(const char* input_im, std::string search_word);
 bool comparePlaces(const Place &a, const Place &b){
 	return (a.match_score>b.match_score);
 }
 Odometry getOdom(std::pair<double, double> pt1, std::pair<double, double> pt2);
+std::pair<double, double> getGPS(Pose robot_pose, std::pair<double, double> pt);
 Pose motionModel(Pose curr_pose, Odometry motion);
 double normalize_angle(double angle);
 Pose correctionStep(Pose estim_pose, std::vector<Location> observs);
-void runKalmanFilter();
+int runKalmanFilter();

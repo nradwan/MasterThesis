@@ -59,7 +59,7 @@ private:
     QMenu *viewMenu;
 
     QNetworkAccessManager *m_netwManager;
-    //char* initial_string = "http://maps.googleapis.com/maps/api/staticmap?center=47.37366,8.5370498&zoom=15&size=400x400";
+    //char* initial_string = "http://maps.googleapis.com/maps/api/staticmap?center=40.737102,-73.990318&zoom=13&size=400x400";
     std::string initial_string;
     std::string marker_string;
     std::string path_string;

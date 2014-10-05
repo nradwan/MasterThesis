@@ -107,10 +107,11 @@ Status Update 21/08:
 		--create an interface for viewing the image from the google static maps DONE
 		--create a function that adds a new point connecting it to a path from the code DONE
 		--always append to the url you have currently the newly added value DONE
-		--call the function from the code everytime a new point has been calculated
+		--call the function from the code everytime a new point has been calculated DONE
 		--static maps from google maps, to highlight the path DONE
 	++Notes:
 			--think about multiple keywords being integrated
 			--maybe having multiple observations (right now we just get only the best search place result)
+			--try ranking maybe not just based on keyword match score but also incorporate distance from gps signal given
 	
 			
