@@ -22,10 +22,10 @@ MainWindow::MainWindow()
     m_netwManager = new QNetworkAccessManager(this);
     connect(m_netwManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(slot_netwManagerFinished(QNetworkReply*)));
 
-    initial_string = "http://maps.googleapis.com/maps/api/staticmap?center=47.3716999,8.535599&zoom=15&size=600x600";
+    initial_string = "http://maps.googleapis.com/maps/api/staticmap?center=47.3716999,8.535599&zoom=14&size=600x600";
     marker_string = "";
     path_string = "";
-    url_string  = "http://maps.googleapis.com/maps/api/staticmap?center=47.3716999,8.535599&zoom=15&size=600x600";
+    url_string  = "http://maps.googleapis.com/maps/api/staticmap?center=47.3716999,8.535599&zoom=14&size=600x600";
 
     downloadImage();
 }

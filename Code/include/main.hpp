@@ -68,14 +68,16 @@ struct Pose{
 };
 
 struct Location{
-	double x;
-	double y;
+	double range;
+	double bearing;
+	int id; //landmark id starts with 0!!
 };
 
 std::string saved_logos_prefix = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Logos/";
 char* TESSDATA_PATH_ = "/usr/local/share/tessdata/";
 char* DETECTION_LANGUAGE_ = "deu+deu-frak+eng";
 char* CONFIG_FILE_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/tesseract-3.03/tessdata/tessconfigs/specialconfig";
+char* MAP_PATH_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Maps/map.png";
 
 static std::string buffer;
 
@@ -90,7 +92,7 @@ std::string ocrCorrection(std::string query);
 void run(char* input_im);
 std::vector<std::string> getCombinations(std::vector<std::string> tokens);
 void combinationRec(std::vector<std::string> &words, int max_len, int curr_size, int curr_start, std::string curr_word, std::vector<std::string> &result);
-Place reverseSearch(const char* input_im, std::string search_word);
+Place reverseSearch(const char* input_im, std::string search_word, std::pair<double, double> gps_loc);
 bool comparePlaces(const Place &a, const Place &b){
 	return (a.match_score>b.match_score);
 }
@@ -98,5 +100,7 @@ Odometry getOdom(std::pair<double, double> pt1, std::pair<double, double> pt2);
 std::pair<double, double> getGPS(Pose robot_pose, std::pair<double, double> pt);
 Pose motionModel(Pose curr_pose, Odometry motion);
 double normalize_angle(double angle);
-Pose correctionStep(Pose estim_pose, std::vector<Location> observs);
+MatrixXd normalize_all_bearings(MatrixXd z);
+Pose correctionStep(Pose estim_pose, std::vector<Location> observs, std::vector<bool> &observed_landmarks);
+void saveMapImage(std::string url);
 int runKalmanFilter();

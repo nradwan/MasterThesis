@@ -23,9 +23,11 @@ public:
     MainWindow();
     bool loadFile();
     void start();
-    void updateGui(std::string appended_point);
+    void updateUrl(std::string appended_point);
+    void updateGui(std::string image_name);
 
     QLabel *imageLabel;
+    std::string url_string;
 
     //char* appended_point;
 
@@ -63,7 +65,6 @@ private:
     std::string initial_string;
     std::string marker_string;
     std::string path_string;
-    std::string url_string;
 };
 
 

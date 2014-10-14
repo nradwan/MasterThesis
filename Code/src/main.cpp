@@ -169,16 +169,16 @@ void run(char* input_im){
 	return;
 }
 
-Place reverseSearch(const char* input_im, std::string search_word){
+Place reverseSearch(const char* input_im, std::string search_word, std::pair<double, double> gps_loc){
 	//first process name of image to get lat and long
 	std::string image_name = input_im;
-	size_t start_pos = image_name.find_first_of('_');
-	size_t end_pos = image_name.find_last_of('.');
-	std::string location = image_name.substr(start_pos+1, end_pos);
-	size_t split = location.find(',');
-	double latitude = atof(location.substr(0, split).c_str());
-	double longitude = atof(location.substr(split+1).c_str());
-	std::pair<double, double > gps_loc (latitude, longitude);
+	//size_t start_pos = image_name.find_first_of('_');
+	//size_t end_pos = image_name.find_last_of('.');
+	//std::string location = image_name.substr(start_pos+1, end_pos);
+	//size_t split = location.find(',');
+	//double latitude = atof(location.substr(0, split).c_str());
+	//double longitude = atof(location.substr(split+1).c_str());
+	//std::pair<double, double > gps_loc (latitude, longitude);
 	//call nearbySearch with the given search word
 	std::vector<Place> possible_locs = nearbySearch(gps_loc, search_word);
 	//call text-spotting for the image
@@ -208,6 +208,8 @@ Place reverseSearch(const char* input_im, std::string search_word){
 	//loop over the places result to match the name
 	for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
 		boost::algorithm::to_lower(it->name);
+		//set the initial score to 0
+		it->match_score = 0;
 		//std::cout << it->name << std::endl;
 		//loop over the recognized text words
 		for(std::vector<std::string>::iterator ij=tokenized_text.begin(); ij!=tokenized_text.end(); ++ij){
@@ -537,6 +539,40 @@ bool logoFound(char* logo_im, const char* input_im){
 	return (double)good_matches.size()/(double)matches.size()>0.4;
 }
 
+void saveMapImage(std::string url){
+	CURL *image;
+	CURLcode imgresult;
+	FILE *fp;
+	
+	image = curl_easy_init();
+	if(image){
+		fp = fopen(MAP_PATH_, "wb");
+		
+		if( fp == NULL ) std::cout << "File cannot be opened"; 
+
+		curl_easy_setopt(image, CURLOPT_URL, url.c_str()); 
+		curl_easy_setopt(image, CURLOPT_WRITEFUNCTION, NULL); 
+		curl_easy_setopt(image, CURLOPT_WRITEDATA, fp); 
+		
+		imgresult = curl_easy_perform(image); 
+		//std::cout << "grabbing image" << std::endl;
+		if( imgresult ){ 
+			std::cout << "Cannot grab the image!\n"; 
+			return;
+		} 
+	}
+	else{
+		std::cout << "curl error" << std::endl;
+		return;
+	}
+
+	// Clean up the resources 
+	curl_easy_cleanup(image); 
+	// Close the file 
+	fclose(fp); 
+	return;
+}
+
 void savePlaceIcon(Place& place){
 	CURL *image; 
 	CURLcode imgresult; 
@@ -719,7 +755,7 @@ void combinationRec(std::vector<std::string> &words, int max_len, int curr_size,
 
 Odometry getOdom(std::pair<double, double> pt1, std::pair<double, double> pt2){
 	//calculate the distance
-	double earth_radius = 6371000; //earth radius in meters
+	double earth_radius = 6371.000; //earth radius in kmeters
 	double phi1 = pt1.first * M_PI / 180;
 	double phi2 = pt2.first * M_PI / 180;
 	double delta_phi = (pt2.first - pt1.first) * M_PI / 180;
@@ -746,15 +782,20 @@ Odometry getOdom(std::pair<double, double> pt1, std::pair<double, double> pt2){
 }
 
 std::pair<double, double> getGPS(Pose robot_pose, std::pair<double, double> pt1){
+	//std::cout << "point: " << pt1.first << "," << pt1.second << std::endl;
+	//std::cout << "robot pose: " << robot_pose.mu(0) << "," << robot_pose.mu(1) << ", " << robot_pose.mu(2) << std::endl;
 	double dist = sqrt(pow(robot_pose.mu(0), 2)+pow(robot_pose.mu(1),2));
-	double earth_radius = 6371000; //earth radius in meters
+	//std::cout << "range: " << dist << std::endl;
+	double earth_radius = 6371.0000; //earth radius in kmeters
 	double delta = (dist / earth_radius);
+	//std::cout << "delta: " << delta << std::endl;
 	double phi1 = pt1.first * M_PI / 180;
 	double lambda1 = pt1.second * M_PI / 180;
 	double phi2 =  asin(sin(phi1) * cos(delta) + cos(phi1) * sin(delta) * cos(robot_pose.mu(2)));
 	double lambda2 = lambda1 + atan2(sin(robot_pose.mu(2)) * sin(delta) * cos(phi1), cos(delta) - sin(phi1) * sin(phi2));
 	phi2 = phi2 * 180 / M_PI;
 	lambda2 = lambda2 * 180 / M_PI;
+	//std::cout << "returning: " << phi2 << "," << lambda2 << std::endl;
 	std::pair<double, double> gps (phi2, lambda2);
 	return gps;
 }
@@ -767,45 +808,145 @@ double normalize_angle(double angle){
 	return angle;
 }
 
+MatrixXd normalize_all_bearings(MatrixXd z){
+	for(int i = 1; i < z.rows(); i += 2){
+		z(i) = normalize_angle(z(i));
+	}
+	return z;
+}
+
 Pose motionModel(Pose curr_pose, Odometry motion){
+	//std::cout << "MOTION MODEL" << std::endl;
+	//std::cout << "prev mu: " << curr_pose.mu << std::endl;
+	//std::cout << "prev sigma: " << curr_pose.sigma << std::endl;
+	
+	double old_theta = curr_pose.mu(2);
+	
 	curr_pose.mu(0) = curr_pose.mu(0) + motion.dist * cos(curr_pose.mu(2) + motion.theta1);
 	curr_pose.mu(1) = curr_pose.mu(1) + motion.dist * sin(curr_pose.mu(2) + motion.theta1);
 	curr_pose.mu(2) = normalize_angle(curr_pose.mu(2) + motion.theta1 + motion.theta2);
 	
+	MatrixXd G = MatrixXd::Identity(curr_pose.sigma.rows(), curr_pose.sigma.cols());
+	G(0,2) = -motion.dist * sin(old_theta + motion.theta1);
+	G(1,2) = motion.dist * cos(old_theta + motion.theta1);
+	//std::cout << "G: " << G << std::endl;
+	
 	double noise = 0.1;
-	MatrixXd motion_noise (3,3);
+	MatrixXd motion_noise = MatrixXd::Zero(curr_pose.sigma.rows(), curr_pose.sigma.cols());
 	motion_noise(0,0) = noise;
 	motion_noise(1,1) = noise;
-	motion_noise(2,2) = noise/10;
-	motion_noise.conservativeResize(curr_pose.sigma.rows(), curr_pose.sigma.cols());
+	motion_noise(2,2) = 1.0 * noise/10;
+	//std::cout << "motion_noise: " << motion_noise << std::endl;
+	//std::cout << G * curr_pose.sigma * G.transpose() << std::endl;
+	curr_pose.sigma = G * curr_pose.sigma * G.transpose() + motion_noise;
 	
-	curr_pose.sigma = curr_pose.sigma + motion_noise;
+	//std::cout << "motion model!" << std::endl;
+	//std::cout << "new mu: " << curr_pose.mu << std::endl;
+	//std::cout << "new sigma: " << std::endl;
+	//std::cout << curr_pose.sigma << std::endl;
+	
 	return curr_pose;
 }
 
-Pose correctionStep(Pose estim_pose, std::vector<Location> observs){
-	//assume that the size of both mu and sigma was already adjusted in the main kalman filter function
-	//so we do not do it here!
-	int num_observ = observs.size();
-	MatrixXd C = 0.0*MatrixXd::Identity(2*num_observ, estim_pose.sigma.rows());
-	MatrixXd sensor_noise = MatrixXd::Identity(2*num_observ, 2*num_observ);
-	MatrixXd kalman_gain = MatrixXd::Zero(estim_pose.sigma.rows(), 2*num_observ);
-	kalman_gain = estim_pose.sigma * C.transpose() * (( C * estim_pose.sigma * C.transpose() + sensor_noise).inverse());
+
+Pose correctionStep(Pose estim_pose, std::vector<Location> observed_locations, std::vector<bool> &observed_landmarks){
+	//std::cout << "CORRECTION STEP" << std::endl;
+	//std::cout << "prev mu: " << estim_pose.mu << std::endl;
+	//std::cout << "prev sigma: " << estim_pose.sigma << std::endl;
 	
-	//create matrix for the difference in location
-	MatrixXd difference = MatrixXd::Zero(2*num_observ, 1);
-	int idx = 0;
-	//loop over the observations and compute the difference between the expected pose and the actual pose
-	for(std::vector<Location>::iterator it = observs.begin(); it!=observs.end(); ++it){	
-		difference(idx) = it->x - estim_pose.mu(0);
-		difference(idx+1) = it->y - estim_pose.mu(1);
-		idx += 2;
+	MatrixXd Z = MatrixXd::Zero(observed_locations.size() * 2, 1);
+	MatrixXd expected_Z = MatrixXd::Zero(observed_locations.size() * 2, 1);
+	MatrixXd delta = MatrixXd::Zero(2, 1);
+	MatrixXd H (observed_locations.size() * 2, estim_pose.sigma.rows());
+	
+	//loop over the observed_locations
+	double curr_range, curr_bearing;
+	int index = 0;
+	for(std::vector<Location>::iterator it = observed_locations.begin(); 
+		it != observed_locations.end(); ++it){
+			//compute the range and bearing
+			curr_range = it->range;
+			curr_bearing = it->bearing;
+			//std::cout << "current landmark range: " << curr_range << ", bearing: " << curr_bearing << std::endl;
+			if(observed_landmarks[it->id] == false)
+			{
+				//initialize the pose of the landmark in mu based on the measurement and the robot pose
+				estim_pose.mu(2 * it->id + 3) = estim_pose.mu(0) + curr_range * cos(curr_bearing + estim_pose.mu(2));
+				estim_pose.mu(2 * it->id + 4) = estim_pose.mu(1) + curr_range * sin(curr_bearing + estim_pose.mu(2));
+			
+				//std::cout << "estimated pose:" << estim_pose.mu(2 * it->id + 3) << ", " << estim_pose.mu(2 * it->id + 4) << std::endl;
+				//std::cout << "mu: " << estim_pose.mu(0) << ", " << estim_pose.mu(1) << std::endl;
+				//std::cout << "current landmark location: " << estim_pose.mu(2 * it->id + 3) << ", " << estim_pose.mu(2 * it->id +4) << std::endl;
+				observed_landmarks[it->id] = true;
+			}
+			//Add the landmark measurement to the Z vector
+			Z(2 * index) = curr_range;
+			Z(2 * index + 1) = curr_bearing;
+			//std::cout << "Z range: " << Z(2 * index) << ",bearing: " << Z(2 * index + 1) << std::endl;
+	
+			//Use the current estimate of the landmark pose
+			//to compute the corresponding expected measurement in expectedZ:
+			delta(0) = estim_pose.mu(2 * it->id + 3) - estim_pose.mu(0);
+			delta(1) = estim_pose.mu(2 * it->id + 4) - estim_pose.mu(1);
+			//std::cout << "delta: " << delta << std::endl;
+			MatrixXd temp = delta.transpose() * delta;
+			double q= temp(0);
+			expected_Z(2 * index) = sqrt(q);
+			expected_Z(2 * index + 1) = normalize_angle(atan2(delta(1), delta(0)) - estim_pose.mu(2));
+			//std::cout << "expected measurement range: " << expected_Z(2 * index) << ", bearing: " << expected_Z(2 * index +1) << std::endl;
+			
+			//Compute the Jacobian Hi of the measurement function h for this observation
+			MatrixXd Hi = MatrixXd::Zero(2, estim_pose.sigma.rows());
+			Hi(0, 0) = -delta(0) / (sqrt(delta(0) * delta(0) + delta(1) * delta(1)));
+			Hi(0, 1) = -delta(1) / (sqrt(delta(0) * delta(0) + delta(1) * delta(1)));
+			Hi(0, 2 * it->id + 3) = delta(0) / (sqrt(delta(0) * delta(0) + delta(1) * delta(1)));
+			Hi(0, 2 * it->id + 4) = delta(1) / (sqrt(delta(0) * delta(0) + delta(1) * delta(1)));
+			Hi(1, 0) = delta(1) / (delta(0) * delta(0) + delta(1) * delta(1));
+			Hi(1, 1) = -delta(0) / (delta(0) * delta(0) + delta(1) * delta(1));
+			Hi(1, 2) = -1;
+			Hi(1, 2 * it->id + 3) = -delta(1) / (delta(0) * delta(0) + delta(1) * delta(1));
+			Hi(1, 2 * it->id + 4) = delta(0) / (delta(0) * delta(0) + delta(1) * delta(1));
+		
+			//std::cout << "Hi:" << Hi << std::endl;
+			
+			// Augment H with the new Hi
+			H << Hi;	
+			//increment the index
+			index++;
 	}
-	estim_pose.mu = estim_pose.mu + kalman_gain * difference;
-	MatrixXd ident = MatrixXd::Identity(estim_pose.sigma.rows(), estim_pose.sigma.cols());
-	estim_pose.sigma = (ident - kalman_gain * C) * estim_pose.sigma;
+	
+	//std::cout << "H matrix: " << H << std::endl;
+
+	//Construct the sensor noise matrix Q
+	MatrixXd Q = 0.01 * MatrixXd::Identity(2 * observed_locations.size(), 2 * observed_locations.size());
+	//std::cout << "Q matrix: " << Q << std::endl;
+
+	//Compute the Kalman gain
+	MatrixXd K = MatrixXd::Zero(estim_pose.sigma.rows(), 2 * observed_locations.size());
+	MatrixXd temp = H * estim_pose.sigma * H.transpose() + Q;
+	//std::cout << "inversion step: " << temp.inverse() << std::endl;
+	//std::cout << "sigma * h^t: " << estim_pose.sigma * H.transpose() << std::endl; 
+	K = estim_pose.sigma * H.transpose() * temp.inverse();
+	//std::cout << "Kalman gain: " << K << std::endl;
+	
+	//Compute the difference between the expected and recorded measurements.
+	//Remember to normalize the bearings after subtracting!
+	MatrixXd difference = normalize_all_bearings(Z - expected_Z);
+	//std::cout << "difference matrix: " << difference << std::endl;
+
+	//Finish the correction step by computing the new mu and sigma.
+	//Normalize theta in the robot pose.
+	estim_pose.mu = estim_pose.mu + K * difference;
+	estim_pose.sigma = (MatrixXd::Identity(estim_pose.sigma.rows(), estim_pose.sigma.cols()) - K * H) * estim_pose.sigma;
+	
+	//std::cout << "correction step!" << std::endl;
+	//std::cout << "new mu: " << estim_pose.mu << std::endl;
+	//std::cout << "new sigma: " << std::endl;
+	//std::cout << estim_pose.sigma << std::endl;
 	return estim_pose;
 }
+
+
 
 int runKalmanFilter(){
 	//initialize visualization
@@ -823,74 +964,74 @@ int runKalmanFilter(){
 	std::string file_loc_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/odometry.dat";
 	std::ifstream data_file;
 	data_file.open(file_loc_.c_str(), std::ios::in);
-	//create an initial pose
-	Pose robot_pose;
-	robot_pose.mu = MatrixXd::Zero(3,1);
-	robot_pose.sigma = MatrixXd::Zero(3,3);
-	//loop over the data file
-	std::string line;
-	Odometry odom;
-	std::pair<double, double> previous_gps;
-	std::pair<double, double> curr_gps;
-	Place best_matching_place;
-	std::pair<double, double> observed_gps;
-	std::pair<double, double> corrected_gps;
-	Odometry observed_odom;
-	Pose prev_robot_pose;
-	Location observed_loc;
 	if(data_file.is_open()){
-		//get the first datapoint for converting from gps to coordinates
-		std::getline(data_file, line);
-		std::stringstream xs (line);
-		xs >> previous_gps.first;
-		xs >> previous_gps.second;
-		corrected_gps.first = previous_gps.first;
-		corrected_gps.second = previous_gps.second;
-		while(std::getline(data_file, line)){
+		std::string curr_line;
+		std::getline(data_file, curr_line);
+		std::stringstream xs (curr_line);		
+		//get the number of landmarks
+		int num_landmarks;
+		xs >> num_landmarks;
+		//get initial gps
+		std::pair<double, double> corrected_gps;
+		xs >> corrected_gps.first;
+		xs >> corrected_gps.second;
+		//initialize the robot pose
+		Pose robot_pose;
+		robot_pose.mu = MatrixXd::Zero(2 * num_landmarks + 3, 1);
+		robot_pose.sigma = MatrixXd::Zero(2 * num_landmarks + 3, 2 * num_landmarks +3);
+		robot_pose.sigma.block(3, 3, 2 * num_landmarks, 2 * num_landmarks).setIdentity();
+		robot_pose.sigma = robot_pose.sigma * 1000;
+		std::vector<bool> observed_landmarks;
+		observed_landmarks.reserve(num_landmarks);
+		std::fill(observed_landmarks.begin(), observed_landmarks.end(), false);
+		
+		int index = 0;
+	
+		//loop over the data
+		while(std::getline(data_file, curr_line)){
+			std::stringstream ss(curr_line);
+			std::pair<double, double> curr_gps;
+			ss >> curr_gps.first;
+			ss >> curr_gps.second;
+			Odometry odom = getOdom(corrected_gps, curr_gps);
+			//call the motion model
+			robot_pose = motionModel(robot_pose, odom);
+			std::pair<double, double> predicted_loc = getGPS(robot_pose, corrected_gps);
+			
+			std::string image_name, search_keyword;
+			ss >> image_name;
+			ss >> search_keyword;
+			//call the reverse search
+			Place best_match = reverseSearch(image_name.c_str(), search_keyword, predicted_loc);
+			std::pair<double, double> observed_gps (best_match.latitude, best_match.longitude);
+			std::cout << "landmark: " << observed_gps.first << "," << observed_gps.second << std::endl;
+			Odometry landmark_odom = getOdom(predicted_loc, observed_gps);
+			Location observed_loc;
+			observed_loc.id = index;
+			observed_loc.range = landmark_odom.dist;
+			observed_loc.bearing = landmark_odom.theta1 + landmark_odom.theta2;
+			//call the correction step
+			std::vector<Location> observations;
+			observations.push_back(observed_loc);
+			robot_pose = correctionStep(robot_pose, observations, observed_landmarks);
+			corrected_gps = getGPS(robot_pose, curr_gps);
+			std::cout << "gps: " << corrected_gps.first << "," << corrected_gps.second << std::endl;
+			
+			//plot the updates
 			std::stringstream parser;
 			parser << corrected_gps.first;
 			parser << ",";
 			parser << corrected_gps.second;
-			imageViewer.updateGui(parser.str());
-			//read the current gps from the file
-			std::stringstream ss (line);
-			ss >> curr_gps.first;
-			ss >> curr_gps.second;
-			//get the image name
-			std::string input_im;
-			ss >> input_im;
-			//get the search keyword
-			std::string keyword;
-			ss >> keyword;
-			//convert the points to odometry
-			odom = getOdom(previous_gps, curr_gps);
-			//call the motion model
-			prev_robot_pose = robot_pose;
-			robot_pose = motionModel(robot_pose, odom);
-			//call the reverseSearch method to get best_matching place
-			best_matching_place = reverseSearch(input_im.c_str(), keyword);
+			imageViewer.updateUrl(parser.str());
+			saveMapImage(imageViewer.url_string);
+			imageViewer.updateGui(MAP_PATH_);
 			app.processEvents();
-			//convert the observed gps to odom
-			observed_gps.first = best_matching_place.latitude;
-			observed_gps.second = best_matching_place.longitude;
-			observed_odom = getOdom(previous_gps, observed_gps);
-			prev_robot_pose = motionModel(prev_robot_pose, observed_odom);
-			observed_loc.x = prev_robot_pose.mu(0);
-			observed_loc.y = prev_robot_pose.mu(1);
-			std::cout << "loc: " << observed_loc.x << " " << observed_loc.y << std::endl;
-			//resize the mu and sigma to add the observed loc
-			robot_pose.mu.conservativeResize(robot_pose.mu.rows()+1,1);
-			robot_pose.sigma.conservativeResize(robot_pose.sigma.rows()+1, robot_pose.sigma.cols()+1);
-			//call the correction step
-			std::vector<Location> observs;
-			observs.push_back(observed_loc);
-			robot_pose = correctionStep(robot_pose, observs);
-			//get the new gps
-			corrected_gps = getGPS(robot_pose, previous_gps);
-			std::cout << "corrected_gps: " << corrected_gps.first << " " << corrected_gps.second << std::endl;
-			//make the curr_gps the previous
-			previous_gps = curr_gps;
+			
+			index++;
+			
 		}
+		
 	}
 	return app.exec();
 }
+
