@@ -540,6 +540,7 @@ bool logoFound(char* logo_im, const char* input_im){
 }
 
 void saveMapImage(std::string url){
+	//std::cout << "url: " << url << std::endl;
 	CURL *image;
 	CURLcode imgresult;
 	FILE *fp;
@@ -985,6 +986,7 @@ int runKalmanFilter(){
 		observed_landmarks.reserve(num_landmarks);
 		std::fill(observed_landmarks.begin(), observed_landmarks.end(), false);
 		
+		std::string label;
 		int index = 0;
 	
 		//loop over the data
@@ -993,10 +995,21 @@ int runKalmanFilter(){
 			std::pair<double, double> curr_gps;
 			ss >> curr_gps.first;
 			ss >> curr_gps.second;
+			
+			//add the current location markers
+			std::stringstream robot_loc_parser;
+			robot_loc_parser << curr_gps.first;
+			robot_loc_parser << ",";
+			robot_loc_parser << curr_gps.second;
+			std::stringstream robot_label_parser;
+			robot_label_parser << "R";
+			robot_label_parser << index;
+			imageViewer.updateTrueLocs(robot_loc_parser.str(), robot_label_parser.str());
+			
 			Odometry odom = getOdom(corrected_gps, curr_gps);
 			//call the motion model
 			robot_pose = motionModel(robot_pose, odom);
-			std::pair<double, double> predicted_loc = getGPS(robot_pose, corrected_gps);
+			std::pair<double, double> predicted_loc = getGPS(robot_pose, curr_gps);
 			
 			std::string image_name, search_keyword;
 			ss >> image_name;
@@ -1004,6 +1017,17 @@ int runKalmanFilter(){
 			//call the reverse search
 			Place best_match = reverseSearch(image_name.c_str(), search_keyword, predicted_loc);
 			std::pair<double, double> observed_gps (best_match.latitude, best_match.longitude);
+			
+			//add the current landmark location markers
+			std::stringstream landmark_loc_parser;
+			landmark_loc_parser << observed_gps.first;
+			landmark_loc_parser << ",";
+			landmark_loc_parser << observed_gps.second;
+			std::stringstream landmark_label_parser;
+			landmark_label_parser << "L";
+			landmark_label_parser << index;
+			imageViewer.updateTrueLandmarks(landmark_loc_parser.str(), landmark_label_parser.str());
+			
 			std::cout << "landmark: " << observed_gps.first << "," << observed_gps.second << std::endl;
 			Odometry landmark_odom = getOdom(predicted_loc, observed_gps);
 			Location observed_loc;
@@ -1022,7 +1046,10 @@ int runKalmanFilter(){
 			parser << corrected_gps.first;
 			parser << ",";
 			parser << corrected_gps.second;
-			imageViewer.updateUrl(parser.str());
+			std::stringstream result_label_parser;
+			result_label_parser << "P";
+			result_label_parser << index;
+			imageViewer.updateUrl(parser.str(), result_label_parser.str());
 			saveMapImage(imageViewer.url_string);
 			imageViewer.updateGui(MAP_PATH_);
 			app.processEvents();
