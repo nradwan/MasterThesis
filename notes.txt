@@ -91,7 +91,7 @@ Status Update 21/08:
 			++implement main method DONE
 			++test motion model (simple testing) DONE
 			++test correction step (simple testing) DONE
-			--IN THE MAIN METHOD:
+			--IN THE MAIN METHOD: DONE
 					++loop over the data file
 					++data file should be filled with the gps coordinates (need one datapoint extra for initialization)
 					++convert them to odometry
@@ -101,7 +101,7 @@ Status Update 21/08:
 					++get the location from the returned result
 					++convert to odometry
 					++call the correction step
-			++TESTING AND CREATING THE FILES
+			++TESTING AND CREATING THE FILES DONE
 	++Visualization:
 		--connect qt to the project DONE
 		--create an interface for viewing the image from the google static maps DONE
@@ -109,9 +109,11 @@ Status Update 21/08:
 		--always append to the url you have currently the newly added value DONE
 		--call the function from the code everytime a new point has been calculated DONE
 		--static maps from google maps, to highlight the path DONE
+		--add print to file!! DONE
 	++Notes:
 			--think about multiple keywords being integrated
 			--maybe having multiple observations (right now we just get only the best search place result)
 			--try ranking maybe not just based on keyword match score but also incorporate distance from gps signal given
-	
+	++Add serialization to cache the search data
+	++Change the view to openstreetmap roadview
 			

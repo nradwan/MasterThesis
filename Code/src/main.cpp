@@ -62,6 +62,37 @@ int main(int argc, char** argv)
 	m.conservativeResize(5,5);
 	std::cout << m << std::endl;*/
 	
+	if(argc >= 2){
+		std::string param = argv[1];
+		if(param.compare("-c") == 0){
+			USE_CACHED_DATA_ = true;
+			//load the data
+			/*std::ifstream file (TEXT_CORR_DATA_);
+			if(file){
+				// Read json.
+				std::istringstream is;
+				std::string line;
+				std::string all_lines = "";
+				while(std::getline(file, line))
+					all_lines += line + "\n";
+				is.str(all_lines);
+				read_json (is, pt_text);
+			}*/
+			std::ifstream nearby_file (NEARBY_DATA_);
+			if(nearby_file){
+				// Read json.
+				std::istringstream is;
+				std::string line;
+				std::string all_lines = "";
+				while(std::getline(nearby_file, line))
+					all_lines += line + "\n";
+				is.str(all_lines);
+				read_json (is, pt_nearby);
+			}
+		}
+		else USE_CACHED_DATA_ = false;
+	}
+	
 	runKalmanFilter();
 	
 	
@@ -359,20 +390,30 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 	ss << "&rankby=distance&keyword=" << keyword << "&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM";
 	std::string url = ss.str();
 	//std::cout << "Will retrive from url: '" << url << "'" << std::endl;
-	//retrieve results from cUrl
-    CURLWrapper::Easy easy;
-    easy.SetOption(CURLOPT_URL, url.c_str());
-    easy.SetOption(CURLOPT_HEADER, 0);
-    easy.SetOption(CURLOPT_FOLLOWLOCATION, 1);
-    easy.SetOption(CURLOPT_WRITEFUNCTION, writer);
-    easy.SetOption(CURLOPT_WRITEDATA, &buffer);
-    easy.Perform();
+	CURLWrapper::Easy easy;
+	if(!USE_CACHED_DATA_){
+		//retrieve results from cUrl
+		easy.SetOption(CURLOPT_URL, url.c_str());
+		easy.SetOption(CURLOPT_HEADER, 0);
+		easy.SetOption(CURLOPT_FOLLOWLOCATION, 1);
+		easy.SetOption(CURLOPT_WRITEFUNCTION, writer);
+		easy.SetOption(CURLOPT_WRITEDATA, &buffer);
+		easy.Perform();
+    }
+    else{
+    	buffer = loadNearbyData(keyword);
+    }
 	//load the results with jansson
 	json_t *root;
     json_error_t error;
     
     root = json_loads(buffer.c_str(), 0, &error);
 	buffer = "";
+	
+	if(!USE_CACHED_DATA_){
+		//write the results to file
+		saveNearbyData(keyword, json_dumps(root, JSON_INDENT(0)));
+	}
 	
 	//check if reply from cUrl is ok
 	if(easy.IsOK()){
@@ -690,19 +731,22 @@ std::string ocrCorrection(std::string query){
 	std::string url = ss.str();
 	//std::cout << url << std::endl;
 	//retrieve results from cUrl
-    CURLWrapper::Easy easy;
-    easy.SetOption(CURLOPT_URL, url.c_str());
-    easy.SetOption(CURLOPT_HEADER, 0);
-    easy.SetOption(CURLOPT_FOLLOWLOCATION, 1);
-    easy.SetOption(CURLOPT_WRITEFUNCTION, writer);
-    easy.SetOption(CURLOPT_WRITEDATA, &buffer);
-    easy.Perform();
+	
+	CURLWrapper::Easy easy;
+	easy.SetOption(CURLOPT_URL, url.c_str());
+	easy.SetOption(CURLOPT_HEADER, 0);
+	easy.SetOption(CURLOPT_FOLLOWLOCATION, 1);
+	easy.SetOption(CURLOPT_WRITEFUNCTION, writer);
+	easy.SetOption(CURLOPT_WRITEDATA, &buffer);
+	easy.Perform();
+   
 	//load the results with jansson
 	json_t *root;
     json_error_t error;
     
     root = json_loads(buffer.c_str(), 0, &error);
 	buffer = "";
+	
 	
 	//check if reply from cUrl is ok
 	if(easy.IsOK()){
@@ -754,6 +798,23 @@ void combinationRec(std::vector<std::string> &words, int max_len, int curr_size,
 	}
 }
 
+void saveNearbyData(std::string keyword, std::string json_data){
+	// Write json.
+	pt_nearby.put (keyword, json_data);
+}
+std::string loadNearbyData(std::string keyword){
+	std::string result = pt_nearby.get<std::string> (keyword);
+	return result;
+}
+/*void saveCorrText(std::string text, std::string corr_text){
+	// Write json.
+	pt_text.put (text, corr_text);
+}
+std::string loadCorrText(std::string text){
+	std::string result = pt_text.get<std::string> (text);
+	return result;
+}*/
+
 Odometry getOdom(std::pair<double, double> pt1, std::pair<double, double> pt2){
 	//calculate the distance
 	double earth_radius = 6371.000; //earth radius in kmeters
@@ -778,7 +839,7 @@ Odometry getOdom(std::pair<double, double> pt1, std::pair<double, double> pt2){
 	Odometry result;
 	result.dist = dist;
 	result.theta1 = initial_angle;
-	result.theta2 = final_angle;
+	result.theta2 = 0;//final_angle;
 	return result; 
 }
 
@@ -947,8 +1008,6 @@ Pose correctionStep(Pose estim_pose, std::vector<Location> observed_locations, s
 	return estim_pose;
 }
 
-
-
 int runKalmanFilter(){
 	//initialize visualization
 	int argc = 5;
@@ -962,9 +1021,9 @@ int runKalmanFilter(){
     MainWindow imageViewer;
     imageViewer.show();
 	//open data file
-	std::string file_loc_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/odometry.dat";
+	//std::string file_loc_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/odometry.dat";
 	std::ifstream data_file;
-	data_file.open(file_loc_.c_str(), std::ios::in);
+	data_file.open(ODOM_DATA_, std::ios::in);
 	if(data_file.is_open()){
 		std::string curr_line;
 		std::getline(data_file, curr_line);
@@ -979,6 +1038,8 @@ int runKalmanFilter(){
 		//initialize the robot pose
 		Pose robot_pose;
 		robot_pose.mu = MatrixXd::Zero(2 * num_landmarks + 3, 1);
+		robot_pose.mu(0) = corrected_gps.first;
+		robot_pose.mu(1) = corrected_gps.second;
 		robot_pose.sigma = MatrixXd::Zero(2 * num_landmarks + 3, 2 * num_landmarks +3);
 		robot_pose.sigma.block(3, 3, 2 * num_landmarks, 2 * num_landmarks).setIdentity();
 		robot_pose.sigma = robot_pose.sigma * 1000;
@@ -988,6 +1049,7 @@ int runKalmanFilter(){
 		
 		std::string label;
 		int index = 0;
+		std::cout << "starting robot pose: " << robot_pose.mu(0) << "," << robot_pose.mu(1) << std::endl;
 	
 		//loop over the data
 		while(std::getline(data_file, curr_line)){
@@ -1006,46 +1068,69 @@ int runKalmanFilter(){
 			robot_label_parser << index;
 			imageViewer.updateTrueLocs(robot_loc_parser.str(), robot_label_parser.str());
 			
-			Odometry odom = getOdom(corrected_gps, curr_gps);
-			//call the motion model
-			robot_pose = motionModel(robot_pose, odom);
-			std::pair<double, double> predicted_loc = getGPS(robot_pose, curr_gps);
+			std::cout << "detected_gps: " << curr_gps.first << "," << curr_gps.second << std::endl;
 			
+			//---------------------------Motion model---------------------------
+			//update the robot pose
+			robot_pose.mu(0) = curr_gps.first;
+			robot_pose.mu(1) = curr_gps.second;
+			//update the sigma
+			double noise = 0.01;
+			MatrixXd motion_noise = MatrixXd::Zero(robot_pose.sigma.rows(), robot_pose.sigma.cols());
+			motion_noise(0,0) = noise;
+			motion_noise(1,1) = noise;
+			motion_noise(2,2) = 1.0 * noise/10;
+			robot_pose.sigma = robot_pose.sigma + motion_noise;
+			
+			std::cout << "after motion model: " << robot_pose.mu(0) << "," << robot_pose.mu(1) << std::endl;
+			
+			//get the image name and search keyword
 			std::string image_name, search_keyword;
 			ss >> image_name;
 			ss >> search_keyword;
-			//call the reverse search
-			Place best_match = reverseSearch(image_name.c_str(), search_keyword, predicted_loc);
-			std::pair<double, double> observed_gps (best_match.latitude, best_match.longitude);
+			Place detected_location = reverseSearch(image_name.c_str(), search_keyword, curr_gps);
+			
+			//-----------------------------------Correction Step-------------------------------------
+			//Construct the sensor noise matrix Q
+			MatrixXd Q = 0.1 * MatrixXd::Identity(2, 2);
+	
+			//Construct the C matrix
+			MatrixXd C = MatrixXd::Identity(2, robot_pose.sigma.rows());
+			
+			//Compute the Kalman gain
+			MatrixXd K = MatrixXd::Zero(robot_pose.sigma.rows(), 2);
+			MatrixXd temp = C * robot_pose.sigma * C.transpose() + Q;
+			//std::cout << "inversion step: " << temp.inverse() << std::endl;
+			//std::cout << "sigma * h^t: " << estim_pose.sigma * H.transpose() << std::endl; 
+			K = robot_pose.sigma * C.transpose() * temp.inverse();
+			//std::cout << "Kalman gain: " << K << std::endl;
+			
+			MatrixXd detected_loc_gps (2, 1);
+			detected_loc_gps(0) = detected_location.latitude;
+			detected_loc_gps(1) = detected_location.longitude;
+			
+			robot_pose.mu = robot_pose.mu + K * (detected_loc_gps - C * robot_pose.mu);
+			MatrixXd ident = MatrixXd::Identity(robot_pose.sigma.rows(), robot_pose.sigma.cols());
+			robot_pose.sigma = (ident - K * C) * robot_pose.sigma;
 			
 			//add the current landmark location markers
 			std::stringstream landmark_loc_parser;
-			landmark_loc_parser << observed_gps.first;
+			landmark_loc_parser << detected_location.latitude;
 			landmark_loc_parser << ",";
-			landmark_loc_parser << observed_gps.second;
+			landmark_loc_parser << detected_location.longitude;
 			std::stringstream landmark_label_parser;
 			landmark_label_parser << "L";
 			landmark_label_parser << index;
 			imageViewer.updateTrueLandmarks(landmark_loc_parser.str(), landmark_label_parser.str());
+			std::cout << "landmark: " << detected_location.latitude << "," << detected_location.longitude << std::endl;
 			
-			std::cout << "landmark: " << observed_gps.first << "," << observed_gps.second << std::endl;
-			Odometry landmark_odom = getOdom(predicted_loc, observed_gps);
-			Location observed_loc;
-			observed_loc.id = index;
-			observed_loc.range = landmark_odom.dist;
-			observed_loc.bearing = landmark_odom.theta1 + landmark_odom.theta2;
-			//call the correction step
-			std::vector<Location> observations;
-			observations.push_back(observed_loc);
-			robot_pose = correctionStep(robot_pose, observations, observed_landmarks);
-			corrected_gps = getGPS(robot_pose, curr_gps);
-			std::cout << "gps: " << corrected_gps.first << "," << corrected_gps.second << std::endl;
+			std::cout << "corrected_gps: " << robot_pose.mu(0) << "," << robot_pose.mu(1) << std::endl;
 			
 			//plot the updates
 			std::stringstream parser;
-			parser << corrected_gps.first;
+			parser << robot_pose.mu(0);
 			parser << ",";
-			parser << corrected_gps.second;
+			parser << robot_pose.mu(1);
 			std::stringstream result_label_parser;
 			result_label_parser << "P";
 			result_label_parser << index;
@@ -1058,6 +1143,158 @@ int runKalmanFilter(){
 			
 		}
 		
+		if(!USE_CACHED_DATA_){
+			std::ostringstream buf; 
+			write_json (buf, pt_nearby, false);
+			std::ofstream nearby_file;
+			nearby_file.open(NEARBY_DATA_);
+			nearby_file << buf.str();
+			nearby_file.close();
+			
+			/*buf.str(""); 
+			write_json (buf, pt_text, false);
+			std::ofstream text_file;
+			text_file.open(TEXT_CORR_DATA_);
+			text_file << buf.str();
+			text_file.close();*/
+		}
+		
+	}
+	return app.exec();
+}
+
+//FIXME
+int runEKalmanFilter(){
+	//initialize visualization
+	int argc = 5;
+	char* argv[5]= {"hello"};
+	QApplication app(argc, argv);
+    QGuiApplication::setApplicationDisplayName(MainWindow::tr("Image Viewer"));
+    QCommandLineParser commandLineParser;
+    commandLineParser.addHelpOption();
+    commandLineParser.addPositionalArgument(MainWindow::tr("[file]"), MainWindow::tr("Image file to open."));
+    commandLineParser.process(QCoreApplication::arguments());
+    MainWindow imageViewer;
+    imageViewer.show();
+	//open data file
+	//std::string file_loc_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/odometry.dat";
+	std::ifstream data_file;
+	data_file.open(ODOM_DATA_, std::ios::in);
+	
+	if(data_file.is_open()){
+		std::string curr_line;
+		std::getline(data_file, curr_line);
+		std::stringstream xs (curr_line);		
+		//get the number of landmarks
+		int num_landmarks;
+		xs >> num_landmarks;
+		//get initial gps
+		std::pair<double, double> corrected_gps;
+		xs >> corrected_gps.first;
+		xs >> corrected_gps.second;
+		//initialize the robot pose
+		Pose robot_pose;
+		robot_pose.mu = MatrixXd::Zero(2 * num_landmarks + 3, 1);
+		robot_pose.mu(0) = corrected_gps.first;
+		robot_pose.mu(1) = corrected_gps.second;
+		robot_pose.sigma = MatrixXd::Zero(2 * num_landmarks + 3, 2 * num_landmarks +3);
+		robot_pose.sigma.block(3, 3, 2 * num_landmarks, 2 * num_landmarks).setIdentity();
+		robot_pose.sigma = robot_pose.sigma * 1000;
+		std::vector<bool> observed_landmarks;
+		observed_landmarks.reserve(num_landmarks);
+		std::fill(observed_landmarks.begin(), observed_landmarks.end(), false);
+		
+		std::string label;
+		int index = 0;
+		std::cout << "starting robot pose: " << robot_pose.mu(0) << "," << robot_pose.mu(1) << std::endl;
+	
+		//loop over the data
+		while(std::getline(data_file, curr_line)){
+			std::stringstream ss(curr_line);
+			std::pair<double, double> curr_gps;
+			ss >> curr_gps.first;
+			ss >> curr_gps.second;
+			
+			//add the current location markers
+			std::stringstream robot_loc_parser;
+			robot_loc_parser << curr_gps.first;
+			robot_loc_parser << ",";
+			robot_loc_parser << curr_gps.second;
+			std::stringstream robot_label_parser;
+			robot_label_parser << "R";
+			robot_label_parser << index;
+			imageViewer.updateTrueLocs(robot_loc_parser.str(), robot_label_parser.str());
+			
+			std::cout << "detected_gps: " << curr_gps.first << "," << curr_gps.second << std::endl;
+			
+			std::pair<double, double> robot_gps (robot_pose.mu(0), robot_pose.mu(1));
+			Odometry odom = getOdom(robot_gps, curr_gps);
+			//call the motion model
+			robot_pose = motionModel(robot_pose, odom);
+			
+			std::cout << "after motion model: " << robot_pose.mu(0) << "," << robot_pose.mu(1) << std::endl;
+			
+			//get the image name and search keyword
+			std::string image_name, search_keyword;
+			ss >> image_name;
+			ss >> search_keyword;
+			Place detected_location = reverseSearch(image_name.c_str(), search_keyword, curr_gps);
+			std::pair<double, double> detected_loc_gps (detected_location.latitude, detected_location.longitude);
+			//add the current landmark location markers
+			std::stringstream landmark_loc_parser;
+			landmark_loc_parser << detected_loc_gps.first;
+			landmark_loc_parser << ",";
+			landmark_loc_parser << detected_loc_gps.second;
+			std::stringstream landmark_label_parser;
+			landmark_label_parser << "L";
+			landmark_label_parser << index;
+			imageViewer.updateTrueLandmarks(landmark_loc_parser.str(), landmark_label_parser.str());
+			std::cout << "landmark: " << detected_loc_gps.first << "," << detected_loc_gps.second << std::endl;
+			
+			//call the correction step
+			robot_gps.first = robot_pose.mu(0);
+			robot_gps.second = robot_pose.mu(1);
+			Odometry landmark_odom = getOdom(robot_gps, detected_loc_gps);
+			Location landmark_loc;
+			landmark_loc.id = index;
+			landmark_loc.range = landmark_odom.dist;
+			landmark_loc.bearing = landmark_odom.theta1;
+			std::vector<Location> observations;
+			observations.push_back(landmark_loc);
+			robot_pose = correctionStep(robot_pose, observations, observed_landmarks);
+			std::cout << "corrected_gps: " << robot_pose.mu(0) << "," << robot_pose.mu(1) << std::endl;
+			
+			//plot the updates
+			std::stringstream parser;
+			parser << robot_pose.mu(0);
+			parser << ",";
+			parser << robot_pose.mu(1);
+			std::stringstream result_label_parser;
+			result_label_parser << "P";
+			result_label_parser << index;
+			imageViewer.updateUrl(parser.str(), result_label_parser.str());
+			saveMapImage(imageViewer.url_string);
+			imageViewer.updateGui(MAP_PATH_);
+			app.processEvents();
+			
+			index++;
+			
+		}
+		if(!USE_CACHED_DATA_){
+			std::ostringstream buf; 
+			write_json (buf, pt_nearby, false);
+			std::ofstream nearby_file;
+			nearby_file.open(NEARBY_DATA_);
+			nearby_file << buf.str();
+			nearby_file.close();
+			
+			/*buf.str(""); 
+			write_json (buf, pt_text, false);
+			std::ofstream text_file;
+			text_file.open(TEXT_CORR_DATA_);
+			text_file << buf.str();
+			text_file.close();*/
+		}
 	}
 	return app.exec();
 }

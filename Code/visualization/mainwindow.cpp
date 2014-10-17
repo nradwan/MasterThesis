@@ -22,10 +22,10 @@ MainWindow::MainWindow()
     m_netwManager = new QNetworkAccessManager(this);
     connect(m_netwManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(slot_netwManagerFinished(QNetworkReply*)));
 
-    initial_string = "http://maps.googleapis.com/maps/api/staticmap?center=47.3716999,8.535599&zoom=15&size=600x600";
+    initial_string = "http://maps.googleapis.com/maps/api/staticmap?center=47.3720546,8.5351289&zoom=15&size=600x600";
     marker_string = "";
     path_string = "";
-    url_string  = "http://maps.googleapis.com/maps/api/staticmap?center=47.3716999,8.535599&zoom=15&size=600x600";
+    url_string  = "http://maps.googleapis.com/maps/api/staticmap?center=47.3720546,8.5351289&zoom=15&size=600x600";
 
     downloadImage();
 }
@@ -78,6 +78,7 @@ bool MainWindow::loadFile()
     imageLabel->setPixmap(pixmap);
     scaleFactor = 1.0;
 
+    printAct->setEnabled(true);
     fitToWindowAct->setEnabled(true);
     updateActions();
 
@@ -103,6 +104,23 @@ void MainWindow::fitToWindow()
     updateActions();
 }
 
+void MainWindow::print()
+{
+    Q_ASSERT(imageLabel->pixmap());
+#ifndef QT_NO_PRINTER
+    QPrintDialog dialog(&printer, this);
+    if (dialog.exec()) {
+        QPainter painter(&printer);
+        QRect rect = painter.viewport();
+        QSize size = imageLabel->pixmap()->size();
+        size.scale(rect.size(), Qt::KeepAspectRatio);
+        painter.setViewport(rect.x(), rect.y(), size.width(), size.height());
+        painter.setWindow(imageLabel->pixmap()->rect());
+        painter.drawPixmap(0, 0, *imageLabel->pixmap());
+    }
+#endif
+}
+
 void MainWindow::createActions()
 {
     exitAct = new QAction(tr("E&xit"), this);
@@ -120,11 +138,17 @@ void MainWindow::createActions()
     fitToWindowAct->setShortcut(tr("Ctrl+F"));
     connect(fitToWindowAct, SIGNAL(triggered()), this, SLOT(fitToWindow()));
 
+    printAct = new QAction(tr("&Print..."), this);
+    printAct->setShortcut(tr("Ctrl+P"));
+    printAct->setEnabled(false);
+    connect(printAct, SIGNAL(triggered()), this, SLOT(print()));
+
 }
 
 void MainWindow::createMenus()
 {
     fileMenu = new QMenu(tr("&File"), this);
+    fileMenu->addAction(printAct);
     fileMenu->addAction(exitAct);
 
     viewMenu = new QMenu(tr("&View"), this);
@@ -158,15 +182,39 @@ void MainWindow::adjustScrollBar(QScrollBar *scrollBar, double factor)
                             + ((factor - 1) * scrollBar->pageStep()/2)));
 }
 
-void MainWindow::updateUrl(std::string appended_point)
+void MainWindow::updateTrueLocs(std::string appended_point, std::string label)
 {
-    if(marker_string.empty()){
-        marker_string = "markers=";
+    if(true_locs.empty()){
+        true_locs = "markers=size:small|color:blue|label:" + label +
+                    "|" + appended_point;
     }
     else{
-        marker_string += "&markers=";
+        true_locs += "&markers=size:small|color:blue|label:" + label +
+                    "|" + appended_point;
     }
-    marker_string += appended_point;
+}
+
+void MainWindow::updateTrueLandmarks(std::string appended_point, std::string label)
+{
+    if(true_landmarks.empty()){
+        true_landmarks = "markers=size:small|color:green|label:" + label +
+                        "|" + appended_point;
+    }
+    else{
+        true_landmarks += "&markers=size:small|color:green|label:" + label +
+                        "|" + appended_point;
+    }
+}
+
+
+void MainWindow::updateUrl(std::string appended_point, std::string label)
+{
+    if(marker_string.empty()){
+        marker_string = "markers=size:small|label:" + label + "|" + appended_point;
+    }
+    else{
+        marker_string += "&markers=size:small|label:" + label + "|" + appended_point;
+    }
 
 
     if(path_string.empty()){
@@ -178,7 +226,7 @@ void MainWindow::updateUrl(std::string appended_point)
     path_string += appended_point;
 
     url_string = initial_string + "&" + marker_string +
-                 "&" + path_string;
+                 "&" + path_string + "&" + true_locs + "&" + true_landmarks;
 
 
     //downloadImage();

@@ -2,6 +2,8 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QPrinter>
+#include <QPrintDialog>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <iostream>
@@ -23,7 +25,9 @@ public:
     MainWindow();
     bool loadFile();
     void start();
-    void updateUrl(std::string appended_point);
+    void updateUrl(std::string appended_point, std::string label);
+    void updateTrueLocs(std::string appended_point, std::string label);
+    void updateTrueLandmarks(std::string appended_point, std::string label);
     void updateGui(std::string image_name);
 
     QLabel *imageLabel;
@@ -34,6 +38,7 @@ public:
 private slots:
     void normalSize();
     void fitToWindow();
+    void print();
     void slot_netwManagerFinished(QNetworkReply *reply);
 
 signals:
@@ -47,6 +52,11 @@ private:
     void adjustScrollBar(QScrollBar *scrollBar, double factor);
     void downloadImage();
 
+#ifndef QT_NO_PRINTER
+    QPrinter printer;
+#endif
+
+    QAction *printAct;
 
     QScrollArea *scrollArea;
     double scaleFactor;
@@ -65,6 +75,8 @@ private:
     std::string initial_string;
     std::string marker_string;
     std::string path_string;
+    std::string true_locs;
+    std::string true_landmarks;
 };
 
 
