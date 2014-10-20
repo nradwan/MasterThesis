@@ -80,6 +80,11 @@ struct Location{
 	int id; //landmark id starts with 0!!
 };
 
+struct latlng{
+	double lat;
+	double lng;
+};
+
 std::string saved_logos_prefix = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Logos/";
 char* TESSDATA_PATH_ = "/usr/local/share/tessdata/";
 char* DETECTION_LANGUAGE_ = "deu+deu-frak+eng";
@@ -87,6 +92,8 @@ char* CONFIG_FILE_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/tes
 char* MAP_PATH_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Maps/map.png";
 char* ODOM_DATA_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/odometry.dat";
 char* NEARBY_DATA_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/nearbyData.txt";
+char* TEMPLATE_FILE_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/template.html";
+char* MAP_VIS_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/map.html";
 //char* TEXT_CORR_DATA_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/textCorr.txt";
 bool USE_CACHED_DATA_ = false;
 
@@ -120,5 +127,8 @@ double normalize_angle(double angle);
 MatrixXd normalize_all_bearings(MatrixXd z);
 Pose correctionStep(Pose estim_pose, std::vector<Location> observs, std::vector<bool> &observed_landmarks);
 void saveMapImage(std::string url);
-int runKalmanFilter();
+void runKalmanFilter();
 int runEKalmanFilter();
+void updateMap(latlng center, std::vector<latlng> locs);
+bool replace(std::string& str, const std::string& from, const std::string& to);
+void replaceAll(std::string& str, const std::string& from, const std::string& to);

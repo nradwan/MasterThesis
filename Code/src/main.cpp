@@ -67,17 +67,17 @@ int main(int argc, char** argv)
 		if(param.compare("-c") == 0){
 			USE_CACHED_DATA_ = true;
 			//load the data
-			/*std::ifstream file (TEXT_CORR_DATA_);
-			if(file){
+			//std::ifstream file (TEXT_CORR_DATA_);
+			//if(file){
 				// Read json.
-				std::istringstream is;
-				std::string line;
-				std::string all_lines = "";
-				while(std::getline(file, line))
-					all_lines += line + "\n";
-				is.str(all_lines);
-				read_json (is, pt_text);
-			}*/
+				//std::istringstream is;
+				//std::string line;
+				//std::string all_lines = "";
+				//while(std::getline(file, line))
+					//all_lines += line + "\n";
+				//is.str(all_lines);
+				//read_json (is, pt_text);
+			//}
 			std::ifstream nearby_file (NEARBY_DATA_);
 			if(nearby_file){
 				// Read json.
@@ -94,6 +94,20 @@ int main(int argc, char** argv)
 	}
 	
 	runKalmanFilter();
+	
+	/*latlng center;
+	center.lat = 4.6;
+	center.lng = 5.0;
+	std::vector<latlng> locs;
+	latlng l1;
+	l1.lat = 2.3;
+	l1.lng = 2.2;
+	latlng l2;
+	l2.lat = 5.4;
+	l2.lng = 4.5;
+	locs.push_back(l1);
+	locs.push_back(l2);
+	updateMap(center, locs);*/
 	
 	
 	return 0;
@@ -1008,9 +1022,9 @@ Pose correctionStep(Pose estim_pose, std::vector<Location> observed_locations, s
 	return estim_pose;
 }
 
-int runKalmanFilter(){
+void runKalmanFilter(){
 	//initialize visualization
-	int argc = 5;
+	/*int argc = 5;
 	char* argv[5]= {"hello"};
 	QApplication app(argc, argv);
     QGuiApplication::setApplicationDisplayName(MainWindow::tr("Image Viewer"));
@@ -1019,9 +1033,11 @@ int runKalmanFilter(){
     commandLineParser.addPositionalArgument(MainWindow::tr("[file]"), MainWindow::tr("Image file to open."));
     commandLineParser.process(QCoreApplication::arguments());
     MainWindow imageViewer;
-    imageViewer.show();
+    imageViewer.show();*/
 	//open data file
 	//std::string file_loc_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/odometry.dat";
+	latlng center;
+	std::vector<latlng> locs;
 	std::ifstream data_file;
 	data_file.open(ODOM_DATA_, std::ios::in);
 	if(data_file.is_open()){
@@ -1035,6 +1051,8 @@ int runKalmanFilter(){
 		std::pair<double, double> corrected_gps;
 		xs >> corrected_gps.first;
 		xs >> corrected_gps.second;
+		center.lat = corrected_gps.first;
+		center.lng = corrected_gps.second;
 		//initialize the robot pose
 		Pose robot_pose;
 		robot_pose.mu = MatrixXd::Zero(2 * num_landmarks + 3, 1);
@@ -1051,6 +1069,7 @@ int runKalmanFilter(){
 		int index = 0;
 		std::cout << "starting robot pose: " << robot_pose.mu(0) << "," << robot_pose.mu(1) << std::endl;
 	
+		latlng tmp;
 		//loop over the data
 		while(std::getline(data_file, curr_line)){
 			std::stringstream ss(curr_line);
@@ -1059,14 +1078,14 @@ int runKalmanFilter(){
 			ss >> curr_gps.second;
 			
 			//add the current location markers
-			std::stringstream robot_loc_parser;
+			/*std::stringstream robot_loc_parser;
 			robot_loc_parser << curr_gps.first;
 			robot_loc_parser << ",";
 			robot_loc_parser << curr_gps.second;
 			std::stringstream robot_label_parser;
 			robot_label_parser << "R";
 			robot_label_parser << index;
-			imageViewer.updateTrueLocs(robot_loc_parser.str(), robot_label_parser.str());
+			imageViewer.updateTrueLocs(robot_loc_parser.str(), robot_label_parser.str());*/
 			
 			std::cout << "detected_gps: " << curr_gps.first << "," << curr_gps.second << std::endl;
 			
@@ -1114,20 +1133,24 @@ int runKalmanFilter(){
 			robot_pose.sigma = (ident - K * C) * robot_pose.sigma;
 			
 			//add the current landmark location markers
-			std::stringstream landmark_loc_parser;
+			/*std::stringstream landmark_loc_parser;
 			landmark_loc_parser << detected_location.latitude;
 			landmark_loc_parser << ",";
 			landmark_loc_parser << detected_location.longitude;
 			std::stringstream landmark_label_parser;
 			landmark_label_parser << "L";
 			landmark_label_parser << index;
-			imageViewer.updateTrueLandmarks(landmark_loc_parser.str(), landmark_label_parser.str());
+			imageViewer.updateTrueLandmarks(landmark_loc_parser.str(), landmark_label_parser.str());*/
 			std::cout << "landmark: " << detected_location.latitude << "," << detected_location.longitude << std::endl;
 			
 			std::cout << "corrected_gps: " << robot_pose.mu(0) << "," << robot_pose.mu(1) << std::endl;
+		
+			tmp.lat = robot_pose.mu(0);
+			tmp.lng = robot_pose.mu(1);
+			locs.push_back(tmp);
 			
 			//plot the updates
-			std::stringstream parser;
+			/*/std::stringstream parser;
 			parser << robot_pose.mu(0);
 			parser << ",";
 			parser << robot_pose.mu(1);
@@ -1137,7 +1160,7 @@ int runKalmanFilter(){
 			imageViewer.updateUrl(parser.str(), result_label_parser.str());
 			saveMapImage(imageViewer.url_string);
 			imageViewer.updateGui(MAP_PATH_);
-			app.processEvents();
+			app.processEvents();*/
 			
 			index++;
 			
@@ -1158,10 +1181,81 @@ int runKalmanFilter(){
 			text_file << buf.str();
 			text_file.close();*/
 		}
-		
+		updateMap(center, locs);
 	}
-	return app.exec();
+	return;
+	//return app.exec();
 }
+
+void updateMap(latlng center, std::vector<latlng> locs){
+	//open the template file
+	std::ifstream templ_file (TEMPLATE_FILE_);
+	//open the map file
+	std::ofstream map_file (MAP_VIS_);
+	
+	//create the json_t objects
+	//for the center
+	json_t *lat, *lng;
+	lat = json_real(center.lat);
+	lng = json_real(center.lng);
+	json_t *center_obj = json_object();
+	json_object_set(center_obj, "lat", lat);
+	json_object_set(center_obj, "lng", lng);
+	std::string center_replace = json_dumps(center_obj, JSON_PRESERVE_ORDER);
+	replaceAll(center_replace, "\"", "");
+	//std::cout << center_replace << std::endl;
+	//for the locs
+	json_t *loc_array = json_array();
+	json_t *loc_lat, *loc_lng, *loc_obj, *loc_latlng;
+	for(std::vector<latlng>::iterator it = locs.begin(); it != locs.end(); ++it){
+		loc_lat = json_real(it->lat);
+		loc_lng = json_real(it->lng);
+		loc_latlng = json_object();
+		json_object_set(loc_latlng, "lat", loc_lat);
+		json_object_set(loc_latlng, "lng", loc_lng);
+		loc_obj = json_object();
+		json_object_set(loc_obj, "latLng", loc_latlng);
+		json_array_append(loc_array, loc_obj);
+		json_decref(loc_obj);
+	}
+	std::string locs_replace = json_dumps(loc_array, JSON_PRESERVE_ORDER);
+	replaceAll(locs_replace, "\"", "");
+	//std::cout << locs_replace << std::endl;
+	
+	std::string line;
+	if(templ_file.is_open() && map_file.is_open()){
+		while(std::getline(templ_file, line)){
+			//try replacing the line
+			replace(line, "$center", center_replace);
+			replace(line, "$loc_vec", locs_replace);
+			//write the line to the map file
+			map_file << line << "\n";
+		}
+	}
+	templ_file.close();
+	map_file.close();
+}
+
+bool replace(std::string& str, const std::string& from, const std::string& to) 
+{
+    size_t start_pos = str.find(from);
+    if(start_pos == std::string::npos)
+        return false;
+    str.replace(start_pos, from.length(), to);
+    return true;
+}
+
+void replaceAll(std::string& str, const std::string& from, const std::string& to) 
+{
+    if(from.empty())
+        return;
+    size_t start_pos = 0;
+    while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+        str.replace(start_pos, from.length(), to);
+        start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
+    }
+}
+
 
 //FIXME
 int runEKalmanFilter(){
