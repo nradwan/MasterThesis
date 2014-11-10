@@ -245,13 +245,58 @@ Place reverseSearch(const char* input_im, std::string search_word, std::pair<dou
 	//check if there was any correction made or not
 	if(corrected_text.compare("")==0)
 		corrected_text = concatenated_text;
-	//split the corrected text by " " and "+"
-	std::vector<std::string> tokenized_text;
-	boost::split(tokenized_text, corrected_text, boost::is_any_of(" +"));
 	
-	size_t found;
+	replaceAll(corrected_text, "+", " ");
+	
+	//remove non characters from string
+	processString(corrected_text);
+	boost::algorithm::to_lower(corrected_text);
+	std::cout << corrected_text << std::endl;
+	
+	if(possible_locs.size() != 0){
+	//find the best match location
+		std::vector<Place>::iterator start = possible_locs.begin();
+		boost::algorithm::to_lower(start->name);
+		replaceAll(start->name, " ", "");
+		int min_score = editDistance(corrected_text, start->name);
+		Place best_match;
+		best_match.longitude = start->longitude;
+		best_match.latitude = start->latitude;
+		best_match.place_icon = start->place_icon;
+		best_match.name = start->name;
+		best_match.match_score = min_score;
+		std::cout << start->name << " score: " << min_score << std::endl;
+		int curr_score;
+		for(std::vector<Place>::iterator it = ++start; it != possible_locs.end(); ++it){
+			boost::algorithm::to_lower(it->name);
+			replaceAll(it->name, " ", "");
+			curr_score = editDistance(corrected_text, it->name);
+			std::cout << it->name << " score: " << curr_score << std::endl;
+			if(curr_score < min_score){
+				min_score = curr_score;
+				best_match.longitude = it->longitude;
+				best_match.latitude = it->latitude;
+				best_match.place_icon = it->place_icon;
+				best_match.name = it->name;
+				best_match.match_score = curr_score;
+			}
+		}
+		std::cout << "best match: " << best_match.name << std::endl;
+		return best_match;
+	
+	}
+	else{
+		std::cout << "Empty result list from nearby search" << std::endl;
+		Place best_match;
+		return best_match;
+	}
+	
+	//split the corrected text by " " and "+"
+	//std::vector<std::string> tokenized_text;
+	//boost::split(tokenized_text, corrected_text, boost::is_any_of(" +"));
+	//size_t found;
 	//loop over the places result to match the name
-	for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
+	/*for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
 		boost::algorithm::to_lower(it->name);
 		//set the initial score to 0
 		it->match_score = 0;
@@ -270,7 +315,7 @@ Place reverseSearch(const char* input_im, std::string search_word, std::pair<dou
 		}
 	}
 	//order the nearby place results by the matching score 
-	std::sort(possible_locs.begin(), possible_locs.end(), comparePlaces);
+	std::sort(possible_locs.begin(), possible_locs.end(), comparePlaces);*/
 	
 	/*for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
 		std::cout << it->name << " " << it->match_score << std::endl;
@@ -295,7 +340,7 @@ Place reverseSearch(const char* input_im, std::string search_word, std::pair<dou
 		break;
 	}*/
 	//return the best place
-	std::vector<Place>::iterator it = possible_locs.begin();
+	/*std::vector<Place>::iterator it = possible_locs.begin();
 	std::cout << "best match: " << it->name << " with score: " << it->match_score << std::endl;
 	Place best_match;
 	best_match.longitude = it->longitude;
@@ -303,7 +348,7 @@ Place reverseSearch(const char* input_im, std::string search_word, std::pair<dou
 	best_match.place_icon = it->place_icon;
 	best_match.name = it->name;
 	best_match.match_score = it->match_score;
-	return best_match;
+	return best_match;*/
 }
 
 std::vector<CvRect > spotText(const char* input_im){
@@ -394,14 +439,14 @@ static int writer(char *data, size_t size, size_t nmemb, std::string *buffer)
     return result;
 }
 
-std::vector<Place> nearbySearch(std::pair<double, double> location, std::string keyword){
+std::vector<Place> nearbySearch(std::pair<double, double> gps_location, std::string keyword){
 	//create vector for the returned results
 	std::vector<Place> nearbyLocs;
 	//format the url
 	std::stringstream ss;
 	ss << "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=";
-	ss << location.first << "," << location.second;
-	ss << "&rankby=distance&keyword=" << keyword << "&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM";
+	ss << gps_location.first << "," << gps_location.second;
+	ss << "&rankby=distance&keyword=*&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM"; //<< keyword << "&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM";
 	std::string url = ss.str();
 	//std::cout << "Will retrive from url: '" << url << "'" << std::endl;
 	CURLWrapper::Easy easy;
@@ -473,7 +518,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 						photo = json_array_get(photos, j);
 						photo_ref = json_object_get(photo, "photo_reference");
 						//call method to return photo query
-						photo_url.push_back(getPhotoRef(json_string_value(photo_ref)));
+						//photo_url.push_back(getPhotoRef(json_string_value(photo_ref)));
 						//std::cout << "boop" << std::endl;
 					}
 				}
@@ -485,6 +530,11 @@ std::vector<Place> nearbySearch(std::pair<double, double> location, std::string 
 				location = json_object_get(geometry, "location");
 				longit = json_object_get(location, "lng");
 				latit = json_object_get(location, "lat");
+				std::pair<double, double> pt1 (json_real_value(latit), json_real_value(longit));
+				Odometry odom = getOdom(gps_location, pt1);
+				double dist = odom.dist;
+				if(dist > 1)
+					continue;
 				//get the name
 				name = json_object_get(data, "name");
 				//create new place
@@ -793,6 +843,46 @@ std::vector<std::string> getCombinations(std::vector<std::string> tokens){
 		combinationRec(tokens, i, 0, 0, "", combin);
 	}	
 	return combin;
+}
+
+int editDistance(std::string s, std::string t){
+	// degenerate cases
+	if(s.compare(t) == 0)
+		return 0;
+	if(s.length() == 0)
+		return t.length();
+	if(t.length() == 0)
+		return s.length();
+
+	// create two work vectors of integer distances
+	int v0 [t.length() + 1];
+	int v1 [t.length() + 1];
+
+	// initialize v0 (the previous row of distances)
+	// this row is A[0][i]: edit distance for an empty s
+	// the distance is just the number of characters to delete from t
+	for (int i = 0; i < t.length() + 1; i++)
+		v0[i] = i;
+
+	for (int i = 0; i < s.length(); i++){
+		// calculate v1 (current row distances) from the previous row v0
+
+		// first element of v1 is A[i+1][0]
+		//   edit distance is delete (i+1) chars from s to match empty t
+		v1[0] = i + 1;
+
+		// use formula to fill in the rest of the row
+		for (int j = 0; j < t.length(); j++){
+			int cost = (s[i] == t[j]) ? 0 : 1;
+			v1[j + 1] = std::min(std::min(v1[j] + 1, v0[j + 1] + 1), v0[j] + cost);
+		}
+
+		// copy v1 (current row) to v0 (previous row) for next iteration
+		for (int j = 0; j < t.length() + 1; j++)
+			v0[j] = v1[j];
+	}
+
+	return v1[t.length()];
 }
 
 void combinationRec(std::vector<std::string> &words, int max_len, int curr_size, int curr_start, std::string curr_word, std::vector<std::string> &result){
@@ -1111,7 +1201,7 @@ void runKalmanFilter(){
 			
 			//-----------------------------------Correction Step-------------------------------------
 			//Construct the sensor noise matrix Q
-			MatrixXd Q = 0.1 * MatrixXd::Identity(2, 2);
+			MatrixXd Q = 0.01 * MatrixXd::Identity(2, 2);
 	
 			//Construct the C matrix
 			MatrixXd C = MatrixXd::Identity(2, robot_pose.sigma.rows());
@@ -1256,6 +1346,23 @@ void replaceAll(std::string& str, const std::string& from, const std::string& to
     }
 }
 
+int isNotAlphaNum(char c){
+        return !std::isalnum(c);
+}
+
+void processString(std::string& str){
+	//replace non alpha-numeric letters with space
+	std::replace_if(str.begin(), str.end(), isNotAlphaNum, ' ');
+	//remove double character letters
+	std::vector<std::string> sub_strings;
+	boost::split(sub_strings, str, boost::is_any_of(" "));
+	str = "";
+	for(std::vector<std::string>::iterator it = sub_strings.begin(); 
+			it != sub_strings.end(); ++it){
+		if(it->length() > 1)
+			str += *it;		
+	}
+}
 
 //FIXME
 int runEKalmanFilter(){

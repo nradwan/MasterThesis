@@ -114,6 +114,28 @@ Status Update 21/08:
 			--think about multiple keywords being integrated
 			--maybe having multiple observations (right now we just get only the best search place result)
 			--try ranking maybe not just based on keyword match score but also incorporate distance from gps signal given
-	++Add serialization to cache the search data
-	++Change the view to openstreetmap roadview
+	++Add serialization to cache the search data DONE
+	++Change the view to openstreetmap roadview DONE
+	++Imporve the text matching part as it finds the text but gives a bigger score to other matches. (implement edit distance algorithm to do the matching) DONE
+	++Find a way to use better keywords as they have a huge influence on the output of the algorithm.
+	++Find a way to crop detected non-words as they mess up the matching with the edit distance algorithm
+	++Maybe find a way to only consider keywords that are closest to our current position (cut off after certain distance) DONE EXCLUDING ALL LOCATIONS AT A DISTANCE GREATER THAN 1 KM FROM GPS
+	++Change the query from searching for a specific keyword to searching for everything in the nearbyloc DONE
+	++Consider removing the text correction part (now handled by the edit distance algorithm)
+	++Maybe set maximum edit distance after which declare failure to match
+	++In such case do query expansion
+	++Read about query expansion
+	
+	ROUGH IDEA:
+	Maybe look for different technique to use that ranks the results better than nearby place search
+	Maybe combine both approaches psuedo relevance feedback and query expansion
+	--Use nearby search with keyword * with radius threshold
+	--Filter the results either taking the type of the first n as positive results and bottom 20-n as negative results
+	--Research with this type
+	--Do the matching
+	OR
+	--Use nearby search with detected word with radius threshold
+	--If the edit distance match is greater than x,
+	--Find synonyms of the words and re-do the search via thesaurus or wordnet (use only all synonyms in synset and hypernyms, however is not reported to be consistently useful)
+	--Do the matching
 			

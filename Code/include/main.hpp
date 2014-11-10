@@ -132,3 +132,6 @@ int runEKalmanFilter();
 void updateMap(latlng center, std::vector<latlng> locs);
 bool replace(std::string& str, const std::string& from, const std::string& to);
 void replaceAll(std::string& str, const std::string& from, const std::string& to);
+int editDistance(std::string query_string, std::string possible_match);
+int isNotAlphaNum(char c);
+void processString(std::string& str);

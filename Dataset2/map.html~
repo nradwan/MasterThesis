@@ -18,8 +18,8 @@
             MQA.EventUtil.observe(window, 'load', function() {
                 var options = {
                     elt: document.getElementById('map'),            // ID of map element on page
-                    zoom: 8,                                        // initial zoom level of the map
-                    latLng: {lat: 47.371699900000003, lng: 8.5355989999999995}/*{ lat: 47.3716999, lng: 8.535599 }   */ // center of map in latitude/longitude
+                    zoom: 15,                                        // initial zoom level of the map
+                    latLng: {lat: 47.375212099999999, lng: 8.5417529000000005}/*{ lat: 47.3716999, lng: 8.535599 }   */ // center of map in latitude/longitude
                 };
 
                 // construct an instance of MQA.TileMap with the options object
@@ -32,7 +32,7 @@
                     // of locations as part of the request parameter
                     map.addRoute({
                         request: { 
-                            locations: [{latLng: {lat: 47.370831150000001, lng: 8.5353329000000002}}, {latLng: {lat: 47.372030240000001, lng: 8.5351901599999991}}, {latLng: {lat: 47.372669307692306, lng: 8.5352310384615393}}, {latLng: {lat: 47.373637649999999, lng: 8.5372025029411773}}, {latLng: {lat: 47.37370202247191, lng: 8.5371926764044943}}]/*[
+                            locations: [{latLng: {lat: 47.37582981818182, lng: 8.5433219090909098}}, {latLng: {lat: 47.376043603053432, lng: 8.5443617251908393}}, {latLng: {lat: 47.376642113870382, lng: 8.5708548225317998}}, {latLng: {lat: 47.43360650414909, lng: 8.5688131869176214}}, {latLng: {lat: 47.374418245210862, lng: 8.544498528064441}}, {latLng: {lat: 47.37390550542289, lng: 8.5423567954292672}}]/*[
                                 { latLng: { lat: 47.3706203, lng: 8.5354738 }},
                                 { latLng: { lat: 47.3720546, lng: 8.5351289 }}
                             ]*/
