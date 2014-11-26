@@ -1,0 +1,54 @@
+<html>
+    <head>
+
+        <style type="text/css">
+            /* This css classname is not styled by the toolkit, and is intentionally
+            left for the developer to customize window content. */
+            .mqabasicwnd-content {
+                font-size: 13px;
+                font-weight: bold;
+                white-space: nowrap;
+            }
+        </style>
+
+        <script type="text/javascript" src="http://www.mapquestapi.com/sdk/js/v7.1.s/mqa.toolkit.js?key=Fmjtd%7Cluurnu0725%2Cba%3Do5-9wra56"></script>
+
+        <script type="text/javascript">
+
+            MQA.EventUtil.observe(window, 'load', function() {
+                var options = {
+                    elt: document.getElementById('map'),            // ID of map element on page
+                    zoom: 8,                                        // initial zoom level of the map
+                    latLng: {lat: 51.511366799999998, lng: -0.1282227}/*{ lat: 47.3716999, lng: 8.535599 }   */ // center of map in latitude/longitude
+                };
+
+                // construct an instance of MQA.TileMap with the options object
+                window.map = new MQA.TileMap(options);
+
+                // download the modules
+                MQA.withModule('new-route', 'smallzoom', 'mousewheel', function() {  
+
+                    // uses the MQA.TileMap.addRoute function to pass in an array
+                    // of locations as part of the request parameter
+                    map.addRoute({
+                        request: { 
+                            locations: [{latLng: {lat: 51.5113439, lng: -0.12821584999999999}}, {latLng: {lat: 51.511356960000001, lng: -0.12859832000000002}}, {latLng: {lat: 51.51199815384615, lng: -0.13308373076923077}}, {latLng: {lat: 51.510986002941181, lng: -0.12886754411764706}}, {latLng: {lat: 51.511008417977528, lng: -0.12904925168539327}}, {latLng: {lat: 51.511246452789699, lng: -0.12838878369098713}}, {latLng: {lat: 51.51031512360656, lng: -0.13218560377049179}}]/*[
+                                { latLng: { lat: 47.3706203, lng: 8.5354738 }},
+                                { latLng: { lat: 47.3720546, lng: 8.5351289 }}
+                            ]*/
+                        }
+                    });
+                });
+
+                map.addControl(new MQA.SmallZoom());
+                map.enableMouseWheelZoom();
+            });
+
+        </script>
+    </head>
+
+    <body>
+        <div id='map' style='width:750px; height:280px;'></div>
+    </body>
+</html>
+            
