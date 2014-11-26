@@ -121,12 +121,11 @@ Status Update 21/08:
 	++Find a way to crop detected non-words as they mess up the matching with the edit distance algorithm
 	++Maybe find a way to only consider keywords that are closest to our current position (cut off after certain distance) DONE EXCLUDING ALL LOCATIONS AT A DISTANCE GREATER THAN 1 KM FROM GPS
 	++Change the query from searching for a specific keyword to searching for everything in the nearbyloc DONE
-	++Consider removing the text correction part (now handled by the edit distance algorithm)
-	++Maybe set maximum edit distance after which declare failure to match
+	++Maybe set maximum edit distance after which declare failure to match DONE
 	++In such case do query expansion
 	++Read about query expansion
 	
-	ROUGH IDEA:
+	ROUGH IDEA: DONE
 	Maybe look for different technique to use that ranks the results better than nearby place search
 	Maybe combine both approaches psuedo relevance feedback and query expansion
 	--Use nearby search with keyword * with radius threshold
@@ -138,4 +137,16 @@ Status Update 21/08:
 	--If the edit distance match is greater than x,
 	--Find synonyms of the words and re-do the search via thesaurus or wordnet (use only all synonyms in synset and hypernyms, however is not reported to be consistently useful)
 	--Do the matching
+	
+	TODO:
+	++If no synonyms found then match with the result of the ocr! DONE
+	++Store the confidence and then search for the word with the most confidence level! DONE
+	++The result of the nearbysearch is arranged by distance (Closest first), if an item is occuring more than once in the result, and with high ranking ===> most probably this is the place we are searching for. (What happens if the other places have lower match socre?) Maybe have some sort of balance between matching score and number of occurences of an item. 
 			
+	NEW GOAL IDEAS:
+	++can use text search to know how many places are available with this kewyord in a certain area. (Use next page token to count all search results).
+	++can also be used to count the prior of this place in the are by adding the gps location parameter.
+	++need to consider buying a license for training the regressor.
+	++but if we use a regressor what would be the y value (should it be manually set? the ground truth)
+	++Maybe use q-learning instead of regression where the reward would be the match percentage (the higher,the higher reward you have)
+	++Split the data into different trials (number of images each), and the goal would be by the last image to have the maximum reward

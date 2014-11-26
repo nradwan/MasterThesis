@@ -39,6 +39,7 @@
 #include <boost/algorithm/string.hpp>
 #include <exception>
 #include <fstream>
+#include <map>
 #define _USE_MATH_DEFINES
 #include <math.h>
 //serialization
@@ -55,11 +56,16 @@ using Eigen::MatrixXd;
 
 #include "../include/ccv.hpp"
 
+//wordnet blast
+#include <wordnet.hh>
+using namespace wnb;
+
 struct Place{
 	double longitude;
 	double latitude;
 	std::vector<std::string> place_icon;
 	std::string name;
+	std::string formatted_name;
 	int match_score;
 };
 
@@ -85,15 +91,21 @@ struct latlng{
 	double lng;
 };
 
+struct sort_pred {
+    bool operator()(const std::pair<std::string,double> &left, const std::pair<std::string,double> &right) {
+        return left.second > right.second;
+    }
+};
+
 std::string saved_logos_prefix = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Logos/";
 char* TESSDATA_PATH_ = "/usr/local/share/tessdata/";
 char* DETECTION_LANGUAGE_ = "deu+deu-frak+eng";
 char* CONFIG_FILE_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/tesseract-3.03/tessdata/tessconfigs/specialconfig";
 char* MAP_PATH_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Maps/map.png";
-char* ODOM_DATA_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/odometry.dat";
-char* NEARBY_DATA_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/nearbyData.txt";
-char* TEMPLATE_FILE_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/template.html";
-char* MAP_VIS_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/map.html";
+char* ODOM_DATA_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset1/odometry.dat";
+char* NEARBY_DATA_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset1/nearbyData.txt";
+char* TEMPLATE_FILE_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset1/template.html";
+char* MAP_VIS_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset1/map.html";
 //char* TEXT_CORR_DATA_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/textCorr.txt";
 bool USE_CACHED_DATA_ = false;
 
@@ -104,7 +116,7 @@ ptree pt_nearby;
 std::vector<CvRect > spotText(const char* input_im);
 std::vector<std::pair<char*, int> > performOcr(std::vector<CvRect > bounding_boxes, const char* input_im);
 static int writer(char *data, size_t size, size_t nmemb, std::string *buffer);
-std::vector<Place> nearbySearch(std::pair<double, double> location, std::string keyword);
+std::vector<Place> nearbySearch(std::pair<double, double> location, std::string im_name);
 bool logoFound(char* logo_im, const char* input_im);
 void savePlaceIcon(Place& place);
 std::string getPhotoRef(std::string photo_ref);
@@ -112,7 +124,7 @@ std::string ocrCorrection(std::string query);
 void run(char* input_im);
 std::vector<std::string> getCombinations(std::vector<std::string> tokens);
 void combinationRec(std::vector<std::string> &words, int max_len, int curr_size, int curr_start, std::string curr_word, std::vector<std::string> &result);
-Place reverseSearch(const char* input_im, std::string search_word, std::pair<double, double> gps_loc);
+Place reverseSearch(const char* input_im, std::string saved_key, std::pair<double, double> gps_loc);
 bool comparePlaces(const Place &a, const Place &b){
 	return (a.match_score>b.match_score);
 }
@@ -133,5 +145,8 @@ void updateMap(latlng center, std::vector<latlng> locs);
 bool replace(std::string& str, const std::string& from, const std::string& to);
 void replaceAll(std::string& str, const std::string& from, const std::string& to);
 int editDistance(std::string query_string, std::string possible_match);
-int isNotAlphaNum(char c);
-void processString(std::string& str);
+int isNotAlphabetic(char c);
+std::string processString(std::string& str);
+Place queryExpansion(std::vector<std::pair<std::string, int> > detected_words, std::string formatted_name, std::pair<double, double> gps_loc);
+Place getBestMatch(std::vector<Place> possible_locs, std::string corrected_text);
+void normalizeBatchData(std::vector<std::pair<std::string, double> >& batch_data);

@@ -214,7 +214,7 @@ void run(char* input_im){
 	return;
 }
 
-Place reverseSearch(const char* input_im, std::string search_word, std::pair<double, double> gps_loc){
+Place reverseSearch(const char* input_im, std::string saved_key, std::pair<double, double> gps_loc){
 	//first process name of image to get lat and long
 	std::string image_name = input_im;
 	//size_t start_pos = image_name.find_first_of('_');
@@ -225,9 +225,11 @@ Place reverseSearch(const char* input_im, std::string search_word, std::pair<dou
 	//double longitude = atof(location.substr(split+1).c_str());
 	//std::pair<double, double > gps_loc (latitude, longitude);
 	//call nearbySearch with the given search word
-	std::vector<Place> possible_locs = nearbySearch(gps_loc, search_word);
+	std::vector<Place> possible_locs = nearbySearch(gps_loc, saved_key);
 	//call text-spotting for the image
+	std::cout << "calling SpotText with: " << input_im << std::endl;
 	std::vector<CvRect > bounding_boxes = spotText(input_im);
+	std::cout << "finished text spotting" << std::endl;
 	//call tesseract for the output
 	std::vector<std::pair<char*, int> > detected_words = performOcr(bounding_boxes, input_im);
 	//do ocr correction step
@@ -241,7 +243,9 @@ Place reverseSearch(const char* input_im, std::string search_word, std::pair<dou
 	//replace any remaining " " by "+"
 	std::replace(concatenated_text.begin(), concatenated_text.end(), ' ', '+');
 	//call ocrCorrection
+	std::cout << "calling ocrCorrection!" << std::endl;
 	std::string corrected_text = ocrCorrection(concatenated_text);
+	std::cout << "returned from ocrCorrection!" << std::endl;
 	//check if there was any correction made or not
 	if(corrected_text.compare("")==0)
 		corrected_text = concatenated_text;
@@ -249,106 +253,277 @@ Place reverseSearch(const char* input_im, std::string search_word, std::pair<dou
 	replaceAll(corrected_text, "+", " ");
 	
 	//remove non characters from string
-	processString(corrected_text);
+	std::string ocr_text = processString(corrected_text);
 	boost::algorithm::to_lower(corrected_text);
 	std::cout << corrected_text << std::endl;
 	
+	//readjust the scores
+	std::stringstream space_sep_text (ocr_text);
+	std::vector<std::pair<std::string, int > > new_detected_words;
+	do{
+		std::string tmp;
+		space_sep_text >> tmp;
+		//std::cout << "tmp now contains: " << tmp << std::endl;
+		//int idx = 0;
+		//loop over the detected words
+		for(std::vector<std::pair<char*, int > >::iterator it = detected_words.begin();
+				it != detected_words.end(); ++it){
+			//std::cout << "word: " << it->first << std::endl;
+			std::string word = it->first;
+			size_t found_idx = word.find(tmp);
+			if(found_idx != std::string::npos){
+				//std::cout << "found: " << it->first << std::endl;
+				//std::cout << "changing: " << detected_words[idx].first << " to: " << tmp << std::endl;
+				//detected_words[idx].first = &tmp[0];
+				//std::cout << "adding: " << tmp << " with score: " << it->second << std::endl;
+				//std::cout << tmp << std::endl;
+				std::pair<std::string, int> new_pair (tmp, it->second);
+				//std::cout << "pushing: " << new_pair.first << ", score: " << new_pair.second << std::endl;
+				new_detected_words.push_back(new_pair);
+				break;
+			}		
+		}
+	}while(space_sep_text);
+	
+	//print debugging
+	/*std::cout << "printing new_detected_words vector:" << std::endl;
+	for(std::vector<std::pair<std::string, int> >::iterator x = new_detected_words.begin();
+			x != new_detected_words.end(); ++x){
+		std::cout << "word: " << x->first << " score: " << x->second << std::endl;		
+	}
+	std::cout << "==========================================" << std::endl;*/
+	
+	Place best_match = getBestMatch(possible_locs, corrected_text);
+	//check the output of the edit distance
+	//TODO:parameter tuning
+	//if the minimum distance is equal to the length of the longer string
+	//then we do heuristic search with query expansion to find the best keyword
+	int max_str_len = std::max(best_match.formatted_name.length(), corrected_text.length());
+	if(best_match.match_score > (double)(1.0 * max_str_len / 2.0)){
+		std::cout << "best match: " << best_match.name << " with score: " << best_match.match_score
+			<< " max allowed score: " << max_str_len / 2.0 << std::endl;
+			
+		Place query_exp_match = queryExpansion(new_detected_words, corrected_text, gps_loc);
+		//if the query expansion best match has a worse score than the normal
+		//search, then we return the best match result
+		if(query_exp_match.match_score <= best_match.match_score){
+			best_match.longitude = query_exp_match.longitude;
+			best_match.latitude = query_exp_match.latitude;
+			best_match.name = query_exp_match.name;
+			best_match.formatted_name = query_exp_match.formatted_name;
+			best_match.match_score = query_exp_match.match_score;
+		}
+		
+		/*//get the synonyms of the word that has the highest confidence level
+		//initialize wordnet
+		wordnet wn("/usr/share/wordnet/");
+		//arrange the vector by score
+		std::sort(new_detected_words.begin(), new_detected_words.end(), sort_pred());
+		std::vector<std::string> max_synsets;
+		for(std::vector<std::pair<std::string, int> >::iterator ij = new_detected_words.begin();
+				ij != new_detected_words.end(); ++ij){
+			std::cout << "word: " << ij->first << ", score: " << ij->second << std::endl;
+			boost::algorithm::to_lower(ij->first);
+			std::vector<synset> synsets = wn.get_synsets(ij->first);
+			if(synsets.size() == 0)
+				continue;
+			max_synsets = synsets[0].words;
+			break;	
+		}
+		//redo the nearby place search with the keyword being the first synonym
+		//std::ostringstream keyword;
+		//copy(max_synsets.begin(), max_synsets.end(), std::ostream_iterator<std::string>(keyword, "+"));
+		if(max_synsets.size() != 0){
+			std::vector<std::string>::iterator syns_start = max_synsets.begin();
+			std::string str_keyword = *syns_start;//keyword.str();
+			//str_keyword = str_keyword.substr(0, str_keyword.length()-1);
+			std::cout << "query expansion now with keyword: " << str_keyword << std::endl;
+			possible_locs = nearbySearch(gps_loc, str_keyword);
+			if(possible_locs.size() == 0){
+				std::cout << "Empty result list from query expansion" << std::endl;
+			}
+			else{
+				start = possible_locs.begin();
+				boost::algorithm::to_lower(start->name);
+				place_name = start->name;
+				replaceAll(start->name, " ", "");
+				min_score = editDistance(corrected_text, start->name);
+				Place query_exp_match;
+				query_exp_match.longitude = start->longitude;
+				query_exp_match.latitude = start->latitude;
+				//best_match.place_icon = start->place_icon;
+				query_exp_match.name = place_name;
+				query_exp_match.formatted_name = start->name;
+				query_exp_match.match_score = min_score;
+				std::cout << query_exp_match.formatted_name << " score: " << min_score << std::endl;
+				for(std::vector<Place>::iterator it = ++start; it != possible_locs.end(); ++it){
+					boost::algorithm::to_lower(it->name);
+					place_name = it->name;
+					replaceAll(it->name, " ", "");
+					curr_score = editDistance(corrected_text, it->name);
+					std::cout << place_name << " score: " << curr_score << std::endl;
+					if(curr_score < min_score){
+						min_score = curr_score;
+						query_exp_match.longitude = it->longitude;
+						query_exp_match.latitude = it->latitude;
+						//best_match.place_icon = it->place_icon;
+						query_exp_match.name = place_name;
+						query_exp_match.formatted_name = it->name;
+						query_exp_match.match_score = curr_score;
+					}
+				}
+			}
+		}*/
+	}
+	std::cout << "best match: " << best_match.name << " with score: " << best_match.match_score << std::endl;
+	return best_match;
+	
+}
+
+Place getBestMatch(std::vector<Place> possible_locs, std::string corrected_text){
+	Place best_match;
 	if(possible_locs.size() != 0){
-	//find the best match location
+		//find the best match location
 		std::vector<Place>::iterator start = possible_locs.begin();
 		boost::algorithm::to_lower(start->name);
+		std::string place_name = start->name;
 		replaceAll(start->name, " ", "");
 		int min_score = editDistance(corrected_text, start->name);
-		Place best_match;
 		best_match.longitude = start->longitude;
 		best_match.latitude = start->latitude;
-		best_match.place_icon = start->place_icon;
-		best_match.name = start->name;
+		//best_match.place_icon = start->place_icon;
+		best_match.name = place_name;
+		best_match.formatted_name = start->name;
 		best_match.match_score = min_score;
-		std::cout << start->name << " score: " << min_score << std::endl;
+		//std::cout << start->name << " score: " << min_score << std::endl;
 		int curr_score;
 		for(std::vector<Place>::iterator it = ++start; it != possible_locs.end(); ++it){
 			boost::algorithm::to_lower(it->name);
+			place_name = it->name;
 			replaceAll(it->name, " ", "");
 			curr_score = editDistance(corrected_text, it->name);
-			std::cout << it->name << " score: " << curr_score << std::endl;
+			//std::cout << place_name << " score: " << curr_score << std::endl;
 			if(curr_score < min_score){
 				min_score = curr_score;
 				best_match.longitude = it->longitude;
 				best_match.latitude = it->latitude;
-				best_match.place_icon = it->place_icon;
-				best_match.name = it->name;
+				//best_match.place_icon = it->place_icon;
+				best_match.name = place_name;
+				best_match.formatted_name = it->name;
 				best_match.match_score = curr_score;
 			}
 		}
-		std::cout << "best match: " << best_match.name << std::endl;
-		return best_match;
-	
 	}
 	else{
-		std::cout << "Empty result list from nearby search" << std::endl;
-		Place best_match;
-		return best_match;
+		std::cout << "Empty result from nearbySearch" << std::endl;
+		best_match.match_score = 1000;
 	}
-	
-	//split the corrected text by " " and "+"
-	//std::vector<std::string> tokenized_text;
-	//boost::split(tokenized_text, corrected_text, boost::is_any_of(" +"));
-	//size_t found;
-	//loop over the places result to match the name
-	/*for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
-		boost::algorithm::to_lower(it->name);
-		//set the initial score to 0
-		it->match_score = 0;
-		//std::cout << it->name << std::endl;
-		//loop over the recognized text words
-		for(std::vector<std::string>::iterator ij=tokenized_text.begin(); ij!=tokenized_text.end(); ++ij){
-			//try to find if the current word is present in the location name
-			boost::algorithm::to_lower(*ij);
-			//std::cout << *ij << std::endl;
-			found = it->name.find(*ij);
-			//std::cout << found << std::endl;
-			if(found!=std::string::npos){
-				//current word was found in the string
-				it->match_score+= ij->length();
+	return best_match;
+}
+
+Place queryExpansion(std::vector<std::pair<std::string, int> > detected_words, std::string formatted_name, std::pair<double, double> gps_loc){
+	//first normalize the probabilities
+	//loop over the data to get the sum of the confidence levels
+	double sum = 0.0;
+	for(std::vector<std::pair<std::string, int> >::iterator it = detected_words.begin();
+			it != detected_words.end(); ++it){
+		sum += it->second;		
+	}
+	//add the normalized probabilities in a new vector
+	std::vector<std::pair<std::string, double> > batch_data;
+	for(std::vector<std::pair<std::string, int> >::iterator it = detected_words.begin();
+			it != detected_words.end(); ++it){
+		boost::algorithm::to_lower(it->first);
+		std::pair<std::string, double> curr_place (it->first, (double)(1.0 * it->second / sum));
+		std::cout << "place: " << it->first << " normalized score: " << (double)(1.0 * it->second / sum) << std::endl;
+		batch_data.push_back(curr_place);		
+	}
+	//sort by descending order of probabilities
+	std::sort(batch_data.begin(), batch_data.end(), sort_pred());
+	//get the synsets of each word
+	//initialize wordnet
+	wordnet wn("/usr/share/wordnet/");
+	//create a map for the data and synsets
+	std::map<std::string, std::vector<std::string> > word_synsets_map;
+	//create a map for start index at each word
+	std::map<std::string, int> word_index_map;
+	for(std::vector<std::pair<std::string, double> >::iterator it = batch_data.begin();
+			it != batch_data.end(); ++it){
+		std::vector<std::string> synonyms;
+		synonyms.push_back(it->first);
+		std::vector<synset> synsets = wn.get_synsets(it->first);
+		if(synsets.size() == 0)
+			word_synsets[it->first] = synonyms;
+		else{
+			synonyms.insert(synonyms.end(), synsets[0].words.begin(), synsets[0].words.end());
+			word_synsets[it->first] = synonyms;
+		}	
+		word_index_map[it->first] = 0;
+	}
+	//Do the query expansion at most 10 times before returning
+	Place best_match;
+	best_match.match_score = 1000;
+	for(int i = 0; i < 10; i++){
+		int start_idx = 0;
+		while(true){
+			//get the word with the highest probability
+			std::string word_key = batch_data.at(start_idx).first;
+			//get the index to start searching with
+			int idx = word_index_map[word_key];
+			//get the vector of synonyms
+			std::vector<std::string> synonyms = word_synsets_map[word_key];
+			if(idx < synonyms.size())
+				break;
+			else
+				start_idx++;
+			if(start_idx > batch_data.size()){
+				std::cout << "Finished search (ran out of words)" << std::endl;
+				return best_match;
 			}
 		}
-	}
-	//order the nearby place results by the matching score 
-	std::sort(possible_locs.begin(), possible_locs.end(), comparePlaces);*/
-	
-	/*for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
-		std::cout << it->name << " " << it->match_score << std::endl;
-	}*/
-	
-	//loop over the ordered results
-	/*for(std::vector<Place>::iterator it=possible_locs.begin(); it!=possible_locs.end(); ++it){
-		std::cout << it->name << " has a match: " << it->match_score << std::endl;
-		//call logo found
-		for(std::vector<std::string>::iterator ij=it->place_icon.begin(); ij!=it->place_icon.end(); ++ij){
-			bool match = logoFound(&(*ij)[0], input_im);
-			std::string x = match ? " ":" not ";
-			std::cout << "Logo confirmation" << x << "found" << std::endl;
-			if(match)
-				break;
+		std::string search_keyword = synonyms.at(idx);
+		std::cout << "calling nearbySearch with keyword: " << search_keyword << std::endl;
+		//call the nearbySearch with the search keyword
+		std::vector<Place> possible_locs = nearbySearch(gps_loc, search_keyword);
+		//find the best matching place from the possible_locs
+		Place curr_best_match = getBestMatch(possible_locs, corrected_text);
+		//update the best_match
+		if(best_match.match_score >= curr_best_match){
+			best_match.longitude = curr_best_match.longitude;
+			best_match.latitude = curr_best_match.latitude;
+			best_match.name = curr_best_match.name;
+			best_match.formatted_name = curr_best_match.formatted_name;
+			best_match.match_score = curr_best_match.match_score;
 		}
-		/*std::cout << "Display another result? ";
-		char* answer;
-		std::cin >> answer;
-		if(answer[0]=='n')
-			break;
-		break;
-	}*/
-	//return the best place
-	/*std::vector<Place>::iterator it = possible_locs.begin();
-	std::cout << "best match: " << it->name << " with score: " << it->match_score << std::endl;
-	Place best_match;
-	best_match.longitude = it->longitude;
-	best_match.latitude = it->latitude;
-	best_match.place_icon = it->place_icon;
-	best_match.name = it->name;
-	best_match.match_score = it->match_score;
-	return best_match;*/
+		//get the match percentage
+		double max_str_len = std::max(curr_best_match.formatted_name.length(), corrected_text.length());
+		double inv_match_score = max_str_len - curr_best_match.match_score;
+		double match_accuracy = inv_match_score / max_str_len;
+		//update the place probability
+		batch_data.at(0).second = batch_data.at(0).second * match_accuracy;
+		normalizeBatchData(batch_data);
+		//update the index map
+		word_index_map[word_key] = word_index_map[word_key] + 1;
+		//resort by descending order of probabilities
+		std::sort(batch_data.begin(), batch_data.end(), sort_pred());
+	}
+	return best_match;
+}
+
+void normalizeBatchData(std::vector<std::pair<std::string, double> >& batch_data){
+	double sum = 0;
+	for(std::vector<std::pair<std::string, double> >::iterator it = batch_data.begin();
+			it != batch_data.end(); ++it){
+		sum += it->second;		
+	}
+	std::vector<std::pair<std::string, double> > temp;
+	std::copy(batch_data.begin(), batch_data.end(), temp);
+	batch_data.clear();
+	for(std::vector<std::pair<std::string, double> >::iterator it = temp.begin();
+			it != temp.end(); ++it){
+		std::pair<std::string, double> new_elem (it->first, it->second / sum);
+		batch_data.push_back(new_elem);		
+	}
 }
 
 std::vector<CvRect > spotText(const char* input_im){
@@ -440,16 +615,23 @@ static int writer(char *data, size_t size, size_t nmemb, std::string *buffer)
 }
 
 std::vector<Place> nearbySearch(std::pair<double, double> gps_location, std::string keyword){
+	std::string search_keyword;
+	//if the keyword is the image name, then 
+	if(keyword.find("im_") == 0){
+		search_keyword = "*";
+	}
+	else search_keyword = keyword;
 	//create vector for the returned results
 	std::vector<Place> nearbyLocs;
 	//format the url
 	std::stringstream ss;
 	ss << "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=";
 	ss << gps_location.first << "," << gps_location.second;
-	ss << "&rankby=distance&keyword=*&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM"; //<< keyword << "&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM";
+	ss << "&rankby=distance&keyword=" << search_keyword << "&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM";
 	std::string url = ss.str();
-	//std::cout << "Will retrive from url: '" << url << "'" << std::endl;
+	std::cout << "Will retrive from url: '" << url << "'" << std::endl;
 	CURLWrapper::Easy easy;
+	//std::cout << USE_CACHED_DATA_ << std::endl;
 	if(!USE_CACHED_DATA_){
 		//retrieve results from cUrl
 		easy.SetOption(CURLOPT_URL, url.c_str());
@@ -458,6 +640,8 @@ std::vector<Place> nearbySearch(std::pair<double, double> gps_location, std::str
 		easy.SetOption(CURLOPT_WRITEFUNCTION, writer);
 		easy.SetOption(CURLOPT_WRITEDATA, &buffer);
 		easy.Perform();
+		//std::cout << "finished search" << std::endl;
+		//std::cout << buffer << std::endl;
     }
     else{
     	buffer = loadNearbyData(keyword);
@@ -471,7 +655,9 @@ std::vector<Place> nearbySearch(std::pair<double, double> gps_location, std::str
 	
 	if(!USE_CACHED_DATA_){
 		//write the results to file
+		//std::cout << json_dumps(root, JSON_INDENT(0)) << std::endl;
 		saveNearbyData(keyword, json_dumps(root, JSON_INDENT(0)));
+		//std::cout << "finished save" << std::endl;
 	}
 	
 	//check if reply from cUrl is ok
@@ -565,6 +751,7 @@ std::vector<Place> nearbySearch(std::pair<double, double> gps_location, std::str
 		return nearbyLocs;
 	}
 	//std::cout << "returning" << std::endl;
+	//std::cout << "returning: " << nearbyLocs.size() << std::endl;
 	return nearbyLocs;
 }
 
@@ -1194,10 +1381,15 @@ void runKalmanFilter(){
 			std::cout << "after motion model: " << robot_pose.mu(0) << "," << robot_pose.mu(1) << std::endl;
 			
 			//get the image name and search keyword
-			std::string image_name, search_keyword;
+			std::string image_name;//, search_keyword;
 			ss >> image_name;
-			ss >> search_keyword;
-			Place detected_location = reverseSearch(image_name.c_str(), search_keyword, curr_gps);
+			//ss >> search_keyword;
+			unsigned idx = image_name.find_last_of("/");
+			std::string saved_key = image_name.substr(idx + 1);
+			
+			//std::cout << "saved_key: " << saved_key << std::endl;
+			//std::cout << "calling reverseSearch" << std::endl;
+			Place detected_location = reverseSearch(image_name.c_str(), saved_key, curr_gps);
 			
 			//-----------------------------------Correction Step-------------------------------------
 			//Construct the sensor noise matrix Q
@@ -1346,22 +1538,26 @@ void replaceAll(std::string& str, const std::string& from, const std::string& to
     }
 }
 
-int isNotAlphaNum(char c){
-        return !std::isalnum(c);
+int isNotAlphabetic(char c){
+        return !std::isalpha(c) && (c != '\'');
 }
 
-void processString(std::string& str){
-	//replace non alpha-numeric letters with space
-	std::replace_if(str.begin(), str.end(), isNotAlphaNum, ' ');
+std::string processString(std::string& str){
+	//replace non alphabetic letters with space
+	std::replace_if(str.begin(), str.end(), isNotAlphabetic, ' ');
 	//remove double character letters
 	std::vector<std::string> sub_strings;
 	boost::split(sub_strings, str, boost::is_any_of(" "));
 	str = "";
+	std::string result;
 	for(std::vector<std::string>::iterator it = sub_strings.begin(); 
 			it != sub_strings.end(); ++it){
-		if(it->length() > 1)
+		if(it->length() > 1){
 			str += *it;		
+			result += *it + " ";
+		}
 	}
+	return result;
 }
 
 //FIXME
