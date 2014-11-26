@@ -55,6 +55,10 @@ find_package(CCV REQUIRED)
 include_directories(${CCV_INCLUDE_DIR})
 set(LIBS ${CCV_LIBRARY})
 
+find_package(WNB REQUIRED)
+include_directories(${WNB_INCLUDE_DIR})
+set(LIBS ${LIBS} ${WNB_LIBRARY})
+
 find_package(JPEG REQUIRED)
 #include_directories(${JPEG_INCLUDE_DIR})
 set(LIBS ${LIBS} ${JPEG_LIBRARY})
