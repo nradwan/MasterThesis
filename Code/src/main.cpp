@@ -1,15 +1,17 @@
 #include "../include/main.hpp"
+#define pi 3.14159265358979323846
+#define earthRadiusKm 6371.0
 using namespace boost::gil;
 
 int main(int argc, char** argv)
 {
-	/*std::vector<CvRect > recog_text = spotText(argv[1]);
+	std::vector<CvRect > recog_text = spotText(argv[1]);
 	std::vector<std::pair<char*, int > > detection = performOcr(recog_text, argv[1]);
 	for(std::vector<std::pair<char*, int > >::iterator it = detection.begin(); it!=detection.end(); ++it){
 		std::cout << "text: " << it->first << " ,confidence: " << it->second << std::endl;
 	}
 	
-	return 0;*/
+	return 0;
 	
 	/*double latit = atof(argv[1]);
 	double longit = atof(argv[2]);
@@ -62,7 +64,7 @@ int main(int argc, char** argv)
 	m.conservativeResize(5,5);
 	std::cout << m << std::endl;*/
 	
-	if(argc >= 2){
+	/*if(argc >= 2){
 		std::string param = argv[1];
 		if(param.compare("-c") == 0){
 			USE_CACHED_DATA_ = true;
@@ -110,9 +112,9 @@ int main(int argc, char** argv)
 	updateMap(center, locs);*/
 	
 	
-	return 0;
+	//return 0;
 }
-void run(char* input_im){
+/*void run(char* input_im){
 	//first call spotText
 	std::vector<CvRect> bounding_boxes = spotText(input_im);
 	//do ocr on the bounding boxes
@@ -212,7 +214,7 @@ void run(char* input_im){
 	}
 	
 	return;
-}
+}*/
 
 Place reverseSearch(const char* input_im, std::string saved_key, std::pair<double, double> gps_loc){
 	//first process name of image to get lat and long
@@ -225,7 +227,15 @@ Place reverseSearch(const char* input_im, std::string saved_key, std::pair<doubl
 	//double longitude = atof(location.substr(split+1).c_str());
 	//std::pair<double, double > gps_loc (latitude, longitude);
 	//call nearbySearch with the given search word
-	std::vector<Place> possible_locs = nearbySearch(gps_loc, saved_key);
+	std::pair<std::vector<Place>, std::string> nearby_res;
+	nearby_res = nearbySearch(gps_loc, saved_key);
+	std::vector<Place> possible_locs = nearby_res.first;
+	std::string status_string = nearby_res.second;
+	if(status_string.compare("OVER_QUERY_LIMIT") == 0){
+		Place error;
+		error.name = status_string;
+		return error;
+	}
 	//call text-spotting for the image
 	std::cout << "calling SpotText with: " << input_im << std::endl;
 	std::vector<CvRect > bounding_boxes = spotText(input_im);
@@ -255,7 +265,7 @@ Place reverseSearch(const char* input_im, std::string saved_key, std::pair<doubl
 	//remove non characters from string
 	std::string ocr_text = processString(corrected_text);
 	boost::algorithm::to_lower(corrected_text);
-	std::cout << corrected_text << std::endl;
+	std::cout << "corrected text: " << corrected_text << std::endl;
 	
 	//readjust the scores
 	std::stringstream space_sep_text (ocr_text);
@@ -270,10 +280,14 @@ Place reverseSearch(const char* input_im, std::string saved_key, std::pair<doubl
 				it != detected_words.end(); ++it){
 			//std::cout << "word: " << it->first << std::endl;
 			std::string word = it->first;
+			if(tmp.length() < 2)
+				continue;
+			boost::algorithm::to_lower(tmp);
+			boost::algorithm::to_lower(word);
 			size_t found_idx = word.find(tmp);
 			if(found_idx != std::string::npos){
 				//std::cout << "found: " << it->first << std::endl;
-				//std::cout << "changing: " << detected_words[idx].first << " to: " << tmp << std::endl;
+				//std::cout << "changing: " << detected_words[found_idx].first << " to: " << tmp << std::endl;
 				//detected_words[idx].first = &tmp[0];
 				//std::cout << "adding: " << tmp << " with score: " << it->second << std::endl;
 				//std::cout << tmp << std::endl;
@@ -284,6 +298,17 @@ Place reverseSearch(const char* input_im, std::string saved_key, std::pair<doubl
 			}		
 		}
 	}while(space_sep_text);
+	if(new_detected_words.empty()){
+		for(std::vector<std::pair<char*, int> >::iterator it = detected_words.begin();
+				it != detected_words.end(); ++it){
+			std::string corrected_string = it->first;
+			boost::algorithm::to_lower(corrected_string);
+			corrected_string = processString(corrected_string);
+			replaceAll(corrected_string, " ", "");
+			std::pair<std::string, int> new_pair (corrected_string, it->second);
+			new_detected_words.push_back(new_pair);		
+		}
+	}	
 	
 	//print debugging
 	/*std::cout << "printing new_detected_words vector:" << std::endl;
@@ -294,16 +319,22 @@ Place reverseSearch(const char* input_im, std::string saved_key, std::pair<doubl
 	std::cout << "==========================================" << std::endl;*/
 	
 	Place best_match = getBestMatch(possible_locs, corrected_text);
+	std::cout << "best match: " << best_match.name << std::endl;
 	//check the output of the edit distance
 	//TODO:parameter tuning
 	//if the minimum distance is equal to the length of the longer string
 	//then we do heuristic search with query expansion to find the best keyword
 	int max_str_len = std::max(best_match.formatted_name.length(), corrected_text.length());
-	if(best_match.match_score > (double)(1.0 * max_str_len / 2.0)){
+	if(best_match.match_score > ceil((double)(1.0 * max_str_len / 2.0))){
 		std::cout << "best match: " << best_match.name << " with score: " << best_match.match_score
 			<< " max allowed score: " << max_str_len / 2.0 << std::endl;
 			
 		Place query_exp_match = queryExpansion(new_detected_words, corrected_text, gps_loc);
+		if(query_exp_match.name.compare("OVER_QUERY_LIMIT") == 0){
+			//query limit exceeded during queryExpansion, return!
+			std::cout << "query limit exceeded during query expansion" << std::endl;
+			return query_exp_match;
+		}
 		//if the query expansion best match has a worse score than the normal
 		//search, then we return the best match result
 		if(query_exp_match.match_score <= best_match.match_score){
@@ -395,14 +426,14 @@ Place getBestMatch(std::vector<Place> possible_locs, std::string corrected_text)
 		best_match.name = place_name;
 		best_match.formatted_name = start->name;
 		best_match.match_score = min_score;
-		//std::cout << start->name << " score: " << min_score << std::endl;
+		std::cout << start->name << " score: " << min_score << std::endl;
 		int curr_score;
 		for(std::vector<Place>::iterator it = ++start; it != possible_locs.end(); ++it){
 			boost::algorithm::to_lower(it->name);
 			place_name = it->name;
 			replaceAll(it->name, " ", "");
 			curr_score = editDistance(corrected_text, it->name);
-			//std::cout << place_name << " score: " << curr_score << std::endl;
+			std::cout << place_name << " score: " << curr_score << std::endl;
 			if(curr_score < min_score){
 				min_score = curr_score;
 				best_match.longitude = it->longitude;
@@ -431,6 +462,7 @@ Place queryExpansion(std::vector<std::pair<std::string, int> > detected_words, s
 	}
 	//add the normalized probabilities in a new vector
 	std::vector<std::pair<std::string, double> > batch_data;
+	std::cout << "detected_words size: " << detected_words.size() << std::endl;
 	for(std::vector<std::pair<std::string, int> >::iterator it = detected_words.begin();
 			it != detected_words.end(); ++it){
 		boost::algorithm::to_lower(it->first);
@@ -452,43 +484,65 @@ Place queryExpansion(std::vector<std::pair<std::string, int> > detected_words, s
 		std::vector<std::string> synonyms;
 		synonyms.push_back(it->first);
 		std::vector<synset> synsets = wn.get_synsets(it->first);
+		std::cout << "wordNet output for: " << it->first << std::endl;
 		if(synsets.size() == 0)
-			word_synsets[it->first] = synonyms;
+			word_synsets_map[it->first] = synonyms;
 		else{
 			synonyms.insert(synonyms.end(), synsets[0].words.begin(), synsets[0].words.end());
-			word_synsets[it->first] = synonyms;
+			word_synsets_map[it->first] = synonyms;
+			for(std::vector<std::string>::iterator x = synsets[0].words.begin();
+					x != synsets[0].words.end(); ++x){
+				std::cout << *x << std::endl;		
+			}
 		}	
+		std::cout << "==============================================================================" << std::endl;
 		word_index_map[it->first] = 0;
 	}
+	printProbabilities(batch_data);
 	//Do the query expansion at most 10 times before returning
 	Place best_match;
 	best_match.match_score = 1000;
 	for(int i = 0; i < 10; i++){
 		int start_idx = 0;
-		while(true){
+		std::vector<std::string> synonyms;
+		int idx;
+		std::string word_key;
+		while(start_idx < batch_data.size()){
 			//get the word with the highest probability
-			std::string word_key = batch_data.at(start_idx).first;
+			word_key = batch_data.at(start_idx).first;
 			//get the index to start searching with
-			int idx = word_index_map[word_key];
+			idx = word_index_map[word_key];
 			//get the vector of synonyms
-			std::vector<std::string> synonyms = word_synsets_map[word_key];
+			synonyms = word_synsets_map[word_key];
 			if(idx < synonyms.size())
 				break;
 			else
 				start_idx++;
-			if(start_idx > batch_data.size()){
+			if(start_idx >= batch_data.size()){
 				std::cout << "Finished search (ran out of words)" << std::endl;
 				return best_match;
 			}
 		}
+		word_key = batch_data.at(start_idx).first;
+		idx = word_index_map[word_key];
+		synonyms = word_synsets_map[word_key];
 		std::string search_keyword = synonyms.at(idx);
 		std::cout << "calling nearbySearch with keyword: " << search_keyword << std::endl;
 		//call the nearbySearch with the search keyword
-		std::vector<Place> possible_locs = nearbySearch(gps_loc, search_keyword);
+		std::pair<std::vector<Place>, std::string> nearby_res;
+		nearby_res = nearbySearch(gps_loc, search_keyword);
+		std::vector<Place> possible_locs = nearby_res.first;
+		std::string status_string = nearby_res.second;
+		if(status_string.compare("OVER_QUERY_LIMIT") == 0){
+			Place error;
+			error.name = status_string;
+			return error;
+		}
 		//find the best matching place from the possible_locs
-		Place curr_best_match = getBestMatch(possible_locs, corrected_text);
+		Place curr_best_match = getBestMatch(possible_locs, formatted_name);
+		std::cout << "curr_best_match: " << curr_best_match.name << ", score: " << curr_best_match.match_score << std::endl;
 		//update the best_match
-		if(best_match.match_score >= curr_best_match){
+		if(best_match.match_score >= curr_best_match.match_score){
 			best_match.longitude = curr_best_match.longitude;
 			best_match.latitude = curr_best_match.latitude;
 			best_match.name = curr_best_match.name;
@@ -496,21 +550,41 @@ Place queryExpansion(std::vector<std::pair<std::string, int> > detected_words, s
 			best_match.match_score = curr_best_match.match_score;
 		}
 		//get the match percentage
-		double max_str_len = std::max(curr_best_match.formatted_name.length(), corrected_text.length());
+		double max_str_len = std::max(curr_best_match.formatted_name.length(), formatted_name.length());
 		double inv_match_score = max_str_len - curr_best_match.match_score;
 		double match_accuracy = inv_match_score / max_str_len;
+		if(curr_best_match.match_score == 1000){
+			//empty match
+			match_accuracy = 0;
+		}
+		std::cout << "match_accuracy: " << match_accuracy << std::endl;
 		//update the place probability
-		batch_data.at(0).second = batch_data.at(0).second * match_accuracy;
-		normalizeBatchData(batch_data);
+		double success_prob = batch_data.at(start_idx).second;
+		success_prob = success_prob + (1.0 / (idx + 2.0)) * (match_accuracy - success_prob); 
+		std::pair<std::string, double> updated_pair (batch_data.at(start_idx).first, success_prob);
+		batch_data.at(start_idx) = updated_pair;
+		std::cout << "updated probability of: " << word_key << "/" << batch_data.at(start_idx).first << " to: " << success_prob << std::endl;
+		//batch_data.at(0).second = batch_data.at(0).second * match_accuracy;
+		//normalizeBatchData(batch_data);
 		//update the index map
 		word_index_map[word_key] = word_index_map[word_key] + 1;
 		//resort by descending order of probabilities
 		std::sort(batch_data.begin(), batch_data.end(), sort_pred());
+		printProbabilities(batch_data);
 	}
 	return best_match;
 }
 
-void normalizeBatchData(std::vector<std::pair<std::string, double> >& batch_data){
+void printProbabilities(std::vector<std::pair<std::string, double> > batch_data){
+	std::cout << "Printing batch data vector" << std::endl;
+	for(std::vector<std::pair<std::string, double> >::iterator it = batch_data.begin();
+			it != batch_data.end(); ++it){
+		std::cout << it->first << " has now confidence: " << it->second << std::endl;		
+	}
+	std::cout << "=============================================================" << std::endl;
+}
+
+/*void normalizeBatchData(std::vector<std::pair<std::string, double> >& batch_data){
 	double sum = 0;
 	for(std::vector<std::pair<std::string, double> >::iterator it = batch_data.begin();
 			it != batch_data.end(); ++it){
@@ -524,7 +598,7 @@ void normalizeBatchData(std::vector<std::pair<std::string, double> >& batch_data
 		std::pair<std::string, double> new_elem (it->first, it->second / sum);
 		batch_data.push_back(new_elem);		
 	}
-}
+}*/
 
 std::vector<CvRect > spotText(const char* input_im){
 	std::vector<CvRect > text_rect;
@@ -552,10 +626,10 @@ std::vector<CvRect > spotText(const char* input_im){
 	}
 	ccv_matrix_free(image);
 	//Visualization
-	//cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );// Create a window for display.
-    //cvShowImage( "Display window", cv_image );                   // Show our image inside it.
+	cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );// Create a window for display.
+   	cvShowImage( "Display window", cv_image );                   // Show our image inside it.
 
-    //cv::waitKey(0);                                          // Wait for a keystroke in the window
+    cv::waitKey(0);                                          // Wait for a keystroke in the window
     
     return text_rect;
 }
@@ -614,7 +688,7 @@ static int writer(char *data, size_t size, size_t nmemb, std::string *buffer)
     return result;
 }
 
-std::vector<Place> nearbySearch(std::pair<double, double> gps_location, std::string keyword){
+std::pair<std::vector<Place>, std::string> nearbySearch(std::pair<double, double> gps_location, std::string keyword){
 	std::string search_keyword;
 	//if the keyword is the image name, then 
 	if(keyword.find("im_") == 0){
@@ -627,9 +701,9 @@ std::vector<Place> nearbySearch(std::pair<double, double> gps_location, std::str
 	std::stringstream ss;
 	ss << "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=";
 	ss << gps_location.first << "," << gps_location.second;
-	ss << "&rankby=distance&keyword=" << search_keyword << "&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM";
+	ss << "&radius=18&keyword=" << search_keyword << "&key=AIzaSyBwfgwqnuQ9Dkh4gYOFArAmyDBU-dRzhpM";
 	std::string url = ss.str();
-	std::cout << "Will retrive from url: '" << url << "'" << std::endl;
+	//std::cout << "Will retrive from url: '" << url << "'" << std::endl;
 	CURLWrapper::Easy easy;
 	//std::cout << USE_CACHED_DATA_ << std::endl;
 	if(!USE_CACHED_DATA_){
@@ -653,12 +727,12 @@ std::vector<Place> nearbySearch(std::pair<double, double> gps_location, std::str
     root = json_loads(buffer.c_str(), 0, &error);
 	buffer = "";
 	
-	if(!USE_CACHED_DATA_){
+	/*if(!USE_CACHED_DATA_){
 		//write the results to file
 		//std::cout << json_dumps(root, JSON_INDENT(0)) << std::endl;
 		saveNearbyData(keyword, json_dumps(root, JSON_INDENT(0)));
 		//std::cout << "finished save" << std::endl;
-	}
+	}*/
 	
 	//check if reply from cUrl is ok
 	if(easy.IsOK()){
@@ -666,7 +740,8 @@ std::vector<Place> nearbySearch(std::pair<double, double> gps_location, std::str
 		{
 			//fprintf(stderr, "error: on line %d: %s\n", error.line, error.text);
 			std::cout << "error! " << error.line << " " << error.text << std::endl;
-			return nearbyLocs;
+			std::pair<std::vector<Place>, std::string> output (nearbyLocs, "");
+			return output;
 		}
 		json_t *status, *results;
 		//get the returned status
@@ -675,7 +750,8 @@ std::vector<Place> nearbySearch(std::pair<double, double> gps_location, std::str
 		{
 			std::cout << "error: return data : status is not a string" << std::endl;
 			json_decref(root);
-			return nearbyLocs;
+			std::pair<std::vector<Place>, std::string> output (nearbyLocs, "no status");
+			return output;
 		}
 		std::string status_string = json_string_value(status);
 		if(status_string.compare("OK") == 0){
@@ -684,7 +760,8 @@ std::vector<Place> nearbySearch(std::pair<double, double> gps_location, std::str
 			if(!json_is_array(results)){
 				std::cout << "error: return data : results is not an array" << std::endl;
 				json_decref(root);
-				return nearbyLocs;
+				std::pair<std::vector<Place>, std::string> output (nearbyLocs, status_string);
+				return output;
 			}
 			//loop over the results array
 			json_t *data, *geometry, *location, *longit, *latit, *photos, *photo, *photo_ref, *name;
@@ -719,8 +796,9 @@ std::vector<Place> nearbySearch(std::pair<double, double> gps_location, std::str
 				std::pair<double, double> pt1 (json_real_value(latit), json_real_value(longit));
 				Odometry odom = getOdom(gps_location, pt1);
 				double dist = odom.dist;
-				if(dist > 1)
+				if(dist > 0.15)
 					continue;
+				//std::cout << "dist: " << dist << std::endl;
 				//get the name
 				name = json_object_get(data, "name");
 				//create new place
@@ -741,18 +819,28 @@ std::vector<Place> nearbySearch(std::pair<double, double> gps_location, std::str
 			
 		}
 		else{
-			//query failed
-			std::cout << "returned status string: " << status_string << std::endl;
-			return nearbyLocs;
+			std::pair<std::vector<Place>, std::string> output (nearbyLocs, status_string);
+			if(status_string.compare("OVER_QUERY_LIMIT") == 0){
+				//exceded the query limit
+				std::cout << "exceeded query limit for today" << std::endl;
+				return output;
+			}	
+			else{
+				//query failed
+				std::cout << "returned status string: " << status_string << std::endl;
+				return output;
+			}
 		}
 	}
 	else{
+		std::pair<std::vector<Place>, std::string> output (nearbyLocs, "curl error");
 		std::cout << "failed to perform with cUrl" << std::endl;
-		return nearbyLocs;
+		return output;
 	}
 	//std::cout << "returning" << std::endl;
 	//std::cout << "returning: " << nearbyLocs.size() << std::endl;
-	return nearbyLocs;
+	std::pair<std::vector<Place>, std::string> output (nearbyLocs, "OK");
+	return output;
 }
 
 bool logoFound(char* logo_im, const char* input_im){
@@ -1106,32 +1194,32 @@ std::string loadCorrText(std::string text){
 	return result;
 }*/
 
-Odometry getOdom(std::pair<double, double> pt1, std::pair<double, double> pt2){
-	//calculate the distance
-	double earth_radius = 6371.000; //earth radius in kmeters
-	double phi1 = pt1.first * M_PI / 180;
-	double phi2 = pt2.first * M_PI / 180;
-	double delta_phi = (pt2.first - pt1.first) * M_PI / 180;
-	double delta_lambda = (pt2.second - pt1.second) * M_PI / 180;
-	double a = sin(delta_phi/2) * sin(delta_phi/2) + cos(phi1) * cos(phi2) * sin(delta_lambda/2) * sin(delta_lambda/2);
-	double c = 2 * atan2(sqrt(a), sqrt(1-a));
-	double dist = earth_radius * c;
-	
-	//calculate the angle
-	double y1 = sin(delta_lambda) * cos(phi2);
-	double x1 = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(delta_lambda);
-	double initial_angle = atan2(y1, x1);
+// This function converts decimal degrees to radians
+double deg2rad(double deg) {
+  return (deg * pi / 180);
+}
 
-	double delta_lambda2 = (pt1.second - pt2.second) * M_PI / 180;
-	double y2 = sin(delta_lambda2) * cos(phi2);
-	double x2 = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(delta_lambda2);
-	double final_angle = atan2(y2, x2);
-	
+//  This function converts radians to decimal degrees
+double rad2deg(double rad) {
+  return (rad * 180 / pi);
+}
+
+
+double distanceEarth(double lat1d, double lon1d, double lat2d, double lon2d) {
+  double lat1r, lon1r, lat2r, lon2r, u, v;
+  lat1r = deg2rad(lat1d);
+  lon1r = deg2rad(lon1d);
+  lat2r = deg2rad(lat2d);
+  lon2r = deg2rad(lon2d);
+  u = sin((lat2r - lat1r)/2);
+  v = sin((lon2r - lon1r)/2);
+  return 2.0 * earthRadiusKm * asin(sqrt(u * u + cos(lat1r) * cos(lat2r) * v * v));
+}
+
+Odometry getOdom(std::pair<double, double> pt1, std::pair<double, double> pt2){
 	Odometry result;
-	result.dist = dist;
-	result.theta1 = initial_angle;
-	result.theta2 = 0;//final_angle;
-	return result; 
+	result.dist = distanceEarth(pt1.first, pt1.second, pt2.first, pt2.second);
+	return result;
 }
 
 std::pair<double, double> getGPS(Pose robot_pose, std::pair<double, double> pt1){
@@ -1313,10 +1401,20 @@ void runKalmanFilter(){
     imageViewer.show();*/
 	//open data file
 	//std::string file_loc_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/odometry.dat";
+	
+	//open the results file
+	std::ofstream results_file;
+	results_file.open(RESULTS_FILE_, std::ios_base::app);
+	
+	//open the new odometry file to copy the data to
+	std::ofstream new_data_file;
+	new_data_file.open(NEW_ODOM_FILE_);
+		
 	latlng center;
 	std::vector<latlng> locs;
 	std::ifstream data_file;
 	data_file.open(ODOM_DATA_, std::ios::in);
+	
 	if(data_file.is_open()){
 		std::string curr_line;
 		std::getline(data_file, curr_line);
@@ -1347,31 +1445,39 @@ void runKalmanFilter(){
 		std::cout << "starting robot pose: " << robot_pose.mu(0) << "," << robot_pose.mu(1) << std::endl;
 	
 		latlng tmp;
+		bool start_saving = false;
 		//loop over the data
 		while(std::getline(data_file, curr_line)){
+			//if empty line is reached
+			if(curr_line.compare("") == 0)
+				continue;
 			std::stringstream ss(curr_line);
 			std::pair<double, double> curr_gps;
 			ss >> curr_gps.first;
 			ss >> curr_gps.second;
 			
 			//add the current location markers
-			/*std::stringstream robot_loc_parser;
-			robot_loc_parser << curr_gps.first;
-			robot_loc_parser << ",";
-			robot_loc_parser << curr_gps.second;
-			std::stringstream robot_label_parser;
-			robot_label_parser << "R";
-			robot_label_parser << index;
-			imageViewer.updateTrueLocs(robot_loc_parser.str(), robot_label_parser.str());*/
+			//std::stringstream robot_loc_parser;
+			//robot_loc_parser << curr_gps.first;
+			//robot_loc_parser << ",";
+			//robot_loc_parser << curr_gps.second;
+			//std::stringstream robot_label_parser;
+			//robot_label_parser << "R";
+			//robot_label_parser << index;
+			//imageViewer.updateTrueLocs(robot_loc_parser.str(), robot_label_parser.str());
 			
 			std::cout << "detected_gps: " << curr_gps.first << "," << curr_gps.second << std::endl;
 			
+			if(start_saving){
+				new_data_file << curr_line << "\n";
+				continue;
+			}
 			//---------------------------Motion model---------------------------
 			//update the robot pose
 			robot_pose.mu(0) = curr_gps.first;
 			robot_pose.mu(1) = curr_gps.second;
 			//update the sigma
-			double noise = 0.01;
+			double noise = 0.1;
 			MatrixXd motion_noise = MatrixXd::Zero(robot_pose.sigma.rows(), robot_pose.sigma.cols());
 			motion_noise(0,0) = noise;
 			motion_noise(1,1) = noise;
@@ -1390,6 +1496,20 @@ void runKalmanFilter(){
 			//std::cout << "saved_key: " << saved_key << std::endl;
 			//std::cout << "calling reverseSearch" << std::endl;
 			Place detected_location = reverseSearch(image_name.c_str(), saved_key, curr_gps);
+			if(detected_location.name.compare("OVER_QUERY_LIMIT") == 0){
+				//query limit exceeded
+				std::cout << "query limit exceeded\nSaving and exiting" << std::endl;
+				//write the curr_gps and remaining number of landmarks to the new odom file
+				new_data_file << num_landmarks << " " << curr_gps.first << " " << curr_gps.second << "\n";
+				//set flag to true to start copying the remaining data
+				start_saving = true;
+				//close the results file
+				results_file.close();
+				continue;
+			}
+			else{
+				num_landmarks--;
+			}
 			
 			//-----------------------------------Correction Step-------------------------------------
 			//Construct the sensor noise matrix Q
@@ -1415,14 +1535,15 @@ void runKalmanFilter(){
 			robot_pose.sigma = (ident - K * C) * robot_pose.sigma;
 			
 			//add the current landmark location markers
-			/*std::stringstream landmark_loc_parser;
-			landmark_loc_parser << detected_location.latitude;
-			landmark_loc_parser << ",";
-			landmark_loc_parser << detected_location.longitude;
-			std::stringstream landmark_label_parser;
-			landmark_label_parser << "L";
-			landmark_label_parser << index;
-			imageViewer.updateTrueLandmarks(landmark_loc_parser.str(), landmark_label_parser.str());*/
+			//std::stringstream landmark_loc_parser;
+			//landmark_loc_parser << detected_location.latitude;
+			//landmark_loc_parser << ",";
+			//landmark_loc_parser << detected_location.longitude;
+			//std::stringstream landmark_label_parser;
+			//landmark_label_parser << "L";
+			//landmark_label_parser << index;
+			//imageViewer.updateTrueLandmarks(landmark_loc_parser.str(), landmark_label_parser.str());
+			
 			std::cout << "landmark: " << detected_location.latitude << "," << detected_location.longitude << std::endl;
 			
 			std::cout << "corrected_gps: " << robot_pose.mu(0) << "," << robot_pose.mu(1) << std::endl;
@@ -1431,24 +1552,29 @@ void runKalmanFilter(){
 			tmp.lng = robot_pose.mu(1);
 			locs.push_back(tmp);
 			
+			//write the corrected position and the bestmatch loc to file
+			results_file << robot_pose.mu(0) << " " << robot_pose.mu(1) << " " << detected_location.name << "\n";
+			
 			//plot the updates
-			/*/std::stringstream parser;
-			parser << robot_pose.mu(0);
-			parser << ",";
-			parser << robot_pose.mu(1);
-			std::stringstream result_label_parser;
-			result_label_parser << "P";
-			result_label_parser << index;
-			imageViewer.updateUrl(parser.str(), result_label_parser.str());
-			saveMapImage(imageViewer.url_string);
-			imageViewer.updateGui(MAP_PATH_);
-			app.processEvents();*/
+			//std::stringstream parser;
+			//parser << robot_pose.mu(0);
+			//parser << ",";
+			//parser << robot_pose.mu(1);
+			//std::stringstream result_label_parser;
+			//result_label_parser << "P";
+			//result_label_parser << index;
+			//imageViewer.updateUrl(parser.str(), result_label_parser.str());
+			//saveMapImage(imageViewer.url_string);
+			//imageViewer.updateGui(MAP_PATH_);
+			//app.processEvents();
 			
 			index++;
 			
 		}
+		new_data_file.close();
+		data_file.close();
 		
-		if(!USE_CACHED_DATA_){
+		/*if(!USE_CACHED_DATA_){
 			std::ostringstream buf; 
 			write_json (buf, pt_nearby, false);
 			std::ofstream nearby_file;
@@ -1456,13 +1582,13 @@ void runKalmanFilter(){
 			nearby_file << buf.str();
 			nearby_file.close();
 			
-			/*buf.str(""); 
-			write_json (buf, pt_text, false);
-			std::ofstream text_file;
-			text_file.open(TEXT_CORR_DATA_);
-			text_file << buf.str();
-			text_file.close();*/
-		}
+			//buf.str(""); 
+			//write_json (buf, pt_text, false);
+			//std::ofstream text_file;
+			//text_file.open(TEXT_CORR_DATA_);
+			//text_file << buf.str();
+			//text_file.close();
+		}*/
 		updateMap(center, locs);
 	}
 	return;
@@ -1677,7 +1803,7 @@ int runEKalmanFilter(){
 			index++;
 			
 		}
-		if(!USE_CACHED_DATA_){
+		/*if(!USE_CACHED_DATA_){
 			std::ostringstream buf; 
 			write_json (buf, pt_nearby, false);
 			std::ofstream nearby_file;
@@ -1690,8 +1816,8 @@ int runEKalmanFilter(){
 			std::ofstream text_file;
 			text_file.open(TEXT_CORR_DATA_);
 			text_file << buf.str();
-			text_file.close();*/
-		}
+			text_file.close()/
+		}*/
 	}
 	return app.exec();
 }

@@ -16,8 +16,8 @@ char* DATA_ESTIM = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Evalu
 
 int main(){
 	//open the data file
-	ifstream data_true_file (DATA_TRUE);
-	ifstream data_estim_file (DATA_ESTIM);
+	std::ifstream data_true_file (DATA_TRUE);
+	std::ifstream data_estim_file (DATA_ESTIM);
 	//
 	return 1;
 }

@@ -99,13 +99,15 @@ struct sort_pred {
 
 std::string saved_logos_prefix = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Logos/";
 char* TESSDATA_PATH_ = "/usr/local/share/tessdata/";
-char* DETECTION_LANGUAGE_ = "deu+deu-frak+eng";
+char* DETECTION_LANGUAGE_ = "eng";
 char* CONFIG_FILE_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/tesseract-3.03/tessdata/tessconfigs/specialconfig";
 char* MAP_PATH_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Maps/map.png";
-char* ODOM_DATA_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset1/odometry.dat";
-char* NEARBY_DATA_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset1/nearbyData.txt";
-char* TEMPLATE_FILE_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset1/template.html";
-char* MAP_VIS_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset1/map.html";
+char* ODOM_DATA_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset2/odometry.dat";
+char* NEARBY_DATA_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset2/nearbyData.txt";
+char* TEMPLATE_FILE_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset2/template.html";
+char* MAP_VIS_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset2/map.html";
+char* RESULTS_FILE_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset2/results.txt";
+char* NEW_ODOM_FILE_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/London_Dataset2/new_odom.dat";
 //char* TEXT_CORR_DATA_ = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/TestRun/textCorr.txt";
 bool USE_CACHED_DATA_ = false;
 
@@ -116,7 +118,7 @@ ptree pt_nearby;
 std::vector<CvRect > spotText(const char* input_im);
 std::vector<std::pair<char*, int> > performOcr(std::vector<CvRect > bounding_boxes, const char* input_im);
 static int writer(char *data, size_t size, size_t nmemb, std::string *buffer);
-std::vector<Place> nearbySearch(std::pair<double, double> location, std::string im_name);
+std::pair<std::vector<Place>, std::string> nearbySearch(std::pair<double, double> location, std::string im_name);
 bool logoFound(char* logo_im, const char* input_im);
 void savePlaceIcon(Place& place);
 std::string getPhotoRef(std::string photo_ref);
@@ -149,4 +151,5 @@ int isNotAlphabetic(char c);
 std::string processString(std::string& str);
 Place queryExpansion(std::vector<std::pair<std::string, int> > detected_words, std::string formatted_name, std::pair<double, double> gps_loc);
 Place getBestMatch(std::vector<Place> possible_locs, std::string corrected_text);
-void normalizeBatchData(std::vector<std::pair<std::string, double> >& batch_data);
+void printProbabilities(std::vector<std::pair<std::string, double> > batch_data);
+//void normalizeBatchData(std::vector<std::pair<std::string, double> >& batch_data);
