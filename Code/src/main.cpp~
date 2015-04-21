@@ -5,13 +5,13 @@ using namespace boost::gil;
 
 int main(int argc, char** argv)
 {
-	/*std::vector<CvRect > recog_text = spotText(argv[1]);
+	std::vector<CvRect > recog_text = spotText(argv[1]);
 	std::vector<std::pair<char*, int > > detection = performOcr(recog_text, argv[1]);
 	for(std::vector<std::pair<char*, int > >::iterator it = detection.begin(); it!=detection.end(); ++it){
 		std::cout << "text: " << it->first << " ,confidence: " << it->second << std::endl;
 	}
 	
-	return 0;*/
+	return 0;
 	
 	/*double latit = atof(argv[1]);
 	double longit = atof(argv[2]);
@@ -64,7 +64,7 @@ int main(int argc, char** argv)
 	m.conservativeResize(5,5);
 	std::cout << m << std::endl;*/
 	
-	if(argc >= 2){
+	/*if(argc >= 2){
 		std::string param = argv[1];
 		if(param.compare("-c") == 0){
 			USE_CACHED_DATA_ = true;
@@ -112,7 +112,7 @@ int main(int argc, char** argv)
 	updateMap(center, locs);*/
 	
 	
-	return 0;
+	//return 0;
 }
 /*void run(char* input_im){
 	//first call spotText
@@ -622,6 +622,7 @@ std::vector<CvRect > spotText(const char* input_im){
 		}
 		printf("total : %d\n", words->rnum);
 		std::cout << "number of rectangles: " << text_rect.size() << std::endl;
+		std::cout << "data: " << (std::string)words->data << std::endl;
 		ccv_array_free(words);
 	}
 	ccv_matrix_free(image);
@@ -1687,7 +1688,7 @@ std::string processString(std::string& str){
 }
 
 //FIXME
-int runEKalmanFilter(){
+/*int runEKalmanFilter(){
 	//initialize visualization
 	int argc = 5;
 	char* argv[5]= {"hello"};
@@ -1817,8 +1818,8 @@ int runEKalmanFilter(){
 			text_file.open(TEXT_CORR_DATA_);
 			text_file << buf.str();
 			text_file.close()/
-		}*/
+		}
 	}
 	return app.exec();
-}
+}*/
 

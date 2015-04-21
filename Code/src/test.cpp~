@@ -1,4 +1,81 @@
 #include <iostream>
+#include <string>
+#include <sstream>
+#include "../include/CURLWrapper.h"
+#include <vector>
+#include "z3++.h"
+using namespace z3;
+
+struct Point{
+	double x;
+	double y;
+	double r;
+};
+
+bool findIntersection(std::vector<std::pair<double, double> > circles, int inters_radius, Point &res){
+	context c;
+	
+	expr radius = c.real_const("r");
+	expr intr_x = c.real_const("x");
+	expr intr_y = c.real_const("y");
+	ast_vector_tpl<expr> d_list (c);
+	for(int i = 0; i < circles.size(); i++){
+		std::stringstream ss;
+		ss << "d";
+		ss << i;
+		expr t = c.real_const(ss.str().c_str());
+		d_list.push_back(t);
+	}
+	
+	//expr d_1 = c.real_const("d_1");
+	//expr d_2 = c.real_const("d_2");
+	
+	solver s(c);
+	s.add(radius >= 0);
+	s.add(radius * radius == (intr_x * intr_x) + (intr_y * intr_y));
+	
+	for(int i = 0; i < circles.size(); i++){
+		std::pair<double, double> curr_circ = circles.at(i);
+		s.add(d_list[i] > 0);
+		s.add(d_list[i] * d_list[i] <= inters_radius * inters_radius);
+		s.add(d_list[i] * d_list[i] == ((curr_circ.first - intr_x) * (curr_circ.first - intr_x)) + ((curr_circ.second - intr_y) * (curr_circ.second - intr_y)) );
+	}
+	/*s.add(d_1 > 0);
+	s.add(d_2 > 0);
+	s.add(d_1 * d_1 <= inters_radius * inters_radius);
+	s.add(d_1 * d_1 == ((circle1.first - intr_x) * (circle1.first - intr_x)) + ((circle1.second - intr_y) * (circle1.second - intr_y)) );
+	s.add(d_2 * d_2 <= inters_radius * inters_radius);
+	s.add(d_2 * d_2 == ((circle2.first - intr_x) * (circle2.first - intr_x)) + ((circle2.second - intr_y) * (circle2.second - intr_y)) );
+*/
+	//std::cout << s.check() << std::endl;
+	if(s.check() == sat){
+		model m = s.get_model();
+		std::cout << m << std::endl;
+		res.x = m.eval(intr_x);
+		res.y = m.eval(intr_y);
+		res.r = m.eval(radius);
+		return true;
+	}
+	else return false;
+	
+}
+
+int main() {
+	std::pair<double, double> circle_1 (10, 0);
+	std::pair<double, double> circle_2 (5, 0);
+    std::vector<std::pair<double, double> > circles;
+    circles.push_back(circle_1);
+    circles.push_back(circle_2);
+    Point intersec;
+    bool res = findIntersection(circles, 4, intersec);
+	if(res){
+		std::cout << intersec.x << ", " << intersec.y << ", " << intersec.r << std::endl;
+	}
+	//nonlinear_example1();
+}
+
+
+/*#include <iostream>
 #include <fstream>
 #include <vector>
 #include <sstream>
@@ -16,13 +93,13 @@ char* DATA_ESTIM = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Evalu
 
 int main(){
 	//open the data file
-	ifstream data_true_file (DATA_TRUE);
-	ifstream data_estim_file (DATA_ESTIM);
+	std::ifstream data_true_file (DATA_TRUE);
+	std::ifstream data_estim_file (DATA_ESTIM);
 	//
 	return 1;
 }
 
-/*char* TMP_MAP = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Evaluation_Dataset/template.html";
+char* TMP_MAP = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Evaluation_Dataset/template.html";
 char* MAP_TRUE = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Evaluation_Dataset/groundtruth1.html";
 char* MAP_ESTIM = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Evaluation_Dataset/estim1.html";
 char* DATA_TRUE = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Evaluation_Dataset/odom.dat";

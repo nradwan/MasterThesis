@@ -1,0 +1,59 @@
+#include <iostream>
+#include <map>
+#include <stdio.h>
+#include <string.h>
+#include <fstream>
+#include <sstream>
+#include <boost/algorithm/string.hpp>
+#include <vector>
+
+//jansson lib
+#include <jansson.h>
+
+//ccv lib
+#include "../include/ccv.hpp"
+
+//tesseract libs
+#include <publictypes.h>
+#include <baseapi.h>
+#include <allheaders.h>
+
+//opencv libs
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/nonfree/features2d.hpp>
+
+//cURL libs
+//#include <curl/curl.h>
+#include "../include/CURLWrapper.h"
+
+//LM computation
+#include "../include/LM_algorithm.hpp"
+
+//files and folder initializations
+std::string DATAFOLDER = "/home/radwann/Documents/MultipleLandmarkDataset/";
+std::string COORDFILE = "data.txt";
+std::string WORLD = "world.json";
+char* TESSDATA_PATH_ = "/usr/local/share/tessdata/";
+char* DETECTION_LANGUAGE_ = "eng";
+
+//variable declarations
+std::map<std::string, std::pair<double, double> > shops_coords;
+std::vector<std::string> shop_names;
+static std::string buffer;
+
+static int writer(char *data, size_t size, size_t nmemb, std::string *buffer);
+void initializeMap();
+void localize();
+std::vector<CvRect > spotText(const char* input_im);
+std::vector<std::pair< std::pair<char*, int>, std::pair<int, int> > > performOcr(std::vector<CvRect > bounding_boxes, const char* input_im);
+std::string processText(std::vector<std::pair< std::pair<char*, int>, std::pair<int, int> > > detection);
+std::string ocrCorrection(std::string query);
+bool replace(std::string& str, const std::string& from, const std::string& to);
+void replaceAll(std::string& str, const std::string& from, const std::string& to);
+std::string removeNonChars(std::string& str);
+std::string getBestMatch(std::string text);
+int editDistance(std::string s, std::string t);
+std::string triangulate(std::vector<std::string> matching_shops);

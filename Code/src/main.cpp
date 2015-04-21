@@ -1687,7 +1687,7 @@ std::string processString(std::string& str){
 }
 
 //FIXME
-int runEKalmanFilter(){
+/*int runEKalmanFilter(){
 	//initialize visualization
 	int argc = 5;
 	char* argv[5]= {"hello"};
@@ -1817,8 +1817,8 @@ int runEKalmanFilter(){
 			text_file.open(TEXT_CORR_DATA_);
 			text_file << buf.str();
 			text_file.close()/
-		}*/
+		}
 	}
 	return app.exec();
-}
+}*/
 

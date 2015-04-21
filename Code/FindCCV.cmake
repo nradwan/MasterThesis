@@ -5,13 +5,15 @@
 #  CCV_LIBRARY, where to find the CCV library.
  
 FIND_PATH(CCV_INCLUDE_DIR ccv.h PATHS
-  /home/noha/Documents/UniversityofFreiburg/MasterThesis/Code/libccv/lib
+  /home/radwann/Documents/Software/ccv/lib
   )
+  
+MESSAGE(STATUS "CCV includedir: ${CCV_INCLUDE_DIR}")
  
 SET(CCV_NAMES ${CCV_NAMES} ccv libccv libccv.a)
 FIND_LIBRARY(CCV_LIBRARY NAMES ${CCV_NAMES}
   PATHS
-  /home/noha/Documents/UniversityofFreiburg/MasterThesis/Code/libccv/lib
+  /home/radwann/Documents/Software/ccv/lib
 )
  
 # handle the QUIETLY and REQUIRED arguments and set CCV_FOUND to TRUE if

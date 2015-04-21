@@ -1,0 +1,127 @@
+#include "../include/LM_algorithm.hpp"
+
+LMAlgr::LMAlgr(Eigen::MatrixXf observations, Eigen::MatrixXf params, Eigen::MatrixXf &pose){
+	init(observations, params, pose);
+}
+
+LMAlgr::~LMAlgr(){
+
+}
+
+void LMAlgr::init(Eigen::MatrixXf observations, Eigen::MatrixXf params, Eigen::MatrixXf &pose){
+	threshold = 0.000001;
+	//TODO: tune outlier threshold
+	outlier_threshold = 0.87266;//0.785398;//1.570796;//
+	/*std::cout << "calling computeLM" << std::endl;*/
+	computeLM(observations, params, pose);
+}
+
+
+double LMAlgr::normalize_angle(double angle){
+	while(angle>M_PI)
+		angle = angle - 2 * M_PI;
+	while(angle<-1*M_PI)
+		angle = angle + 2*M_PI;
+	return angle;
+}
+
+//uses cauchy as cost function instead of squared error
+//observations is a matrix of nx1 where n is the number of landmarks observed
+//each value in the matrix represents the angle at which the landmark was observed
+//params is a matrix of nx2 where n is the number of landmarks
+//for each landmark, the x and y pose of where it is
+//pose is a matrix of 2x1 containing the initial guess of the robot pose
+//error is a nx1 matrix for the difference between the measurement and the estimated angle
+double LMAlgr::computeError(Eigen::MatrixXf observations, Eigen::MatrixXf params, Eigen::MatrixXf pose, Eigen::MatrixXf &error){
+	Eigen::MatrixXf estimated_angle;
+	estimated_angle.resize(observations.rows(), observations.cols());
+	for(int i = 0; i < observations.rows(); i++){
+		//compute the estimated angle for each landmark
+		estimated_angle(i, 0) = atan2(params(i, 1) - pose(1, 0), params(i, 0) - pose(0, 0));
+		//std::cout << params(i, 1) << " " << params(i, 0) << " " << pose(1, 0) << " " << pose(0, 0) << " " << estimated_angle(i, 0) << " " << observations(i, 0) << std::endl;
+		//compute the error for each landmark
+		error(i, 0) = atan2(sin(observations(i, 0) - estimated_angle(i, 0)), cos(observations(i, 0) - estimated_angle(i, 0)));//normalize_angle(observations(i, 0) - estimated_angle(i, 0));
+	}
+	/*std::cout << "estimated angle: \n" << estimated_angle << std::endl;*/
+	/*std::cout << "error matrix: \n " << error << std::endl;*/
+	//std::cout << "final error value:\n" << error << std::endl;
+	double cost = outlier_threshold * outlier_threshold * log10(1 + (error.squaredNorm() / (outlier_threshold * outlier_threshold)));
+	double weight = sqrt(cost) / error.norm();
+	error = weight * error;
+	return error.squaredNorm();
+}
+
+//params is a matrix of nx2 where n is the number of landmarks
+//for each landmark, the x and y pose of where it is
+//pose is a matrix of 2x1 containing the initial guess of the robot pose
+//delta is a matrix of 2x1 returns the increment in the x and y of the robot
+void LMAlgr::computeIncrement(Eigen::MatrixXf params, Eigen::MatrixXf pose, double lambda, Eigen::MatrixXf error, Eigen::MatrixXf &delta){
+	Eigen::MatrixXf Jac;
+	Jac.resize(params.rows(), 2);
+	//initialize the jacobian matrix
+	for(int i = 0; i < params.rows(); i++){
+		Jac(i, 0) = (params(i, 1) - pose(1, 0)) / (pow(params(i, 0) - pose(0, 0), 2) + pow(params(i, 1) - pose(1, 0), 2));
+		Jac(i, 1) = -1 * (params(i, 0) - pose(0, 0)) / (pow(params(i, 0) - pose(0, 0), 2) + pow(params(i, 1) - pose(1, 0), 2));
+	}
+	Eigen::MatrixXf I;
+	I = Eigen::MatrixXf::Identity(2, 2);
+	Eigen::MatrixXf tmp = (Jac.transpose() * Jac) + (lambda * I);
+	Eigen::MatrixXf incr = tmp.inverse() * Jac.transpose() * error;
+	delta = incr;
+}
+
+//observations is a matrix of nx1 where n is the number of landmarks observed
+//each value in the matrix represents the angle at which the landmark was observed
+//params is a matrix of nx2 where n is the number of landmarks
+//for each landmark, the x and y pose of where it is
+//pose is a matrix of 2x1 containing the initial guess of the robot pose
+void LMAlgr::computeLM(Eigen::MatrixXf observations, Eigen::MatrixXf params, Eigen::MatrixXf &pose){
+	
+	double lambda = 0.0001;
+	//compute the squared error
+	Eigen::MatrixXf error;
+	error.resize(observations.rows(), 1);
+	double squared_error = computeError(observations, params, pose, error);
+	double old_error = std::numeric_limits<double>::max();
+	while(old_error - squared_error > threshold){
+		//std::cout << "squared error: " << squared_error << std::endl;
+		Eigen::MatrixXf delta(2, 1);
+		computeIncrement(params, pose, lambda, error, delta);
+		/*std::cout << "delta: \n" << delta << std::endl;*/
+		Eigen::MatrixXf new_pose = pose + delta;
+		
+		//std::cout << new_pose.transpose() << std::endl;
+		Eigen::MatrixXf new_error;
+		new_error.resize(observations.rows(), 1);
+		double new_sq_error = computeError(observations, params, new_pose, new_error);
+		if(new_sq_error < squared_error){
+			/*std::cout << "case 1: squared error: " << new_sq_error << ", new pose:\n " << new_pose << std::endl;*/
+			pose = new_pose;
+			error = new_error;
+			old_error = squared_error;
+			squared_error = new_sq_error;
+			lambda = lambda / 10;
+		}
+		else{
+			/*std::cout << "case 2: squared error: " << squared_error << std::endl;*/
+			lambda = lambda * 10;
+		}
+	}
+}
+
+/*int main(int argc, char** argv){
+	Eigen::MatrixXf obsr(2, 1);
+	obsr(0, 0) = 2.3;
+	obsr(1, 0) = 1.4;
+	Eigen::MatrixXf params(2, 2);
+	params(0, 0) = 1;
+	params(0, 1) = 1;
+	params(1, 0) = 2;
+	params(1, 1) = 0;
+	Eigen::MatrixXf pose(2, 1);
+	pose(0, 0) = 0;
+	pose(1, 0) = 3;
+	LMAlgr x(obsr, params, pose);
+	//computeLM(obsr, params, pose);
+	std::cout << pose << std::endl;
+}*/

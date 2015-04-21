@@ -1,4 +1,4 @@
-#include <iostream>
+/*#include <iostream>
 #include <fstream>
 #include <vector>
 #include <sstream>
@@ -22,7 +22,7 @@ int main(){
 	return 1;
 }
 
-/*char* TMP_MAP = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Evaluation_Dataset/template.html";
+char* TMP_MAP = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Evaluation_Dataset/template.html";
 char* MAP_TRUE = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Evaluation_Dataset/groundtruth1.html";
 char* MAP_ESTIM = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Evaluation_Dataset/estim1.html";
 char* DATA_TRUE = "/home/noha/Documents/UniversityofFreiburg/MasterThesis/Evaluation_Dataset/odom.dat";

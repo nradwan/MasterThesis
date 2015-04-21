@@ -23,10 +23,10 @@
 #include "boost/gil/extension/io/png_io.hpp"
 
 //visualization
-#include "../visualization/mainwindow.h"
+/*#include "../visualization/mainwindow.h"
 #include <QApplication>
 #include <QCommandLineParser>
-
+*/
 //ubuntu bug
 #include <pthread.h>
 

@@ -1,0 +1,13 @@
+#include "../include/initWorld.hpp"
+
+World::World(){
+	init();
+}
+
+void World::init(){
+	
+	DATAFOLDER = "/home/radwann/Documents/MultipleLandmarkDataset/";
+	WORLD = "world.json";
+	
+	
+}
